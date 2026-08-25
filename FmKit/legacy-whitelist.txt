@@ -1,0 +1,26 @@
+FmKit 旧白名单存档（统一白名单改造前，2026-08-25）
+====================================================================
+
+旧结构中两处各自独立的清单，内容相同：
+
+1) sweep.whitelisted-items（扫地白名单，由 sweep.whitelist-enabled 控制，默认关闭）
+2) bins.valuable-items（到期提醒“只提醒贵重”的过滤清单）
+
+旧清单内容（8 项）：
+
+    DIAMOND
+    EMERALD
+    GOLD_INGOT
+    IRON_INGOT
+    NETHERITE_INGOT
+    ENCHANTED_BOOK
+    ELYTRA
+    TRIDENT
+
+说明：
+- 金锭/铁锭在新清单中已移除（常见矿物，维基稀有度为 Common）。
+- 新清单合并为 sweep.whitelisted-items 一份，含义由 sweep.whitelist-mode
+  决定（VALUABLE=提醒过滤 / EXEMPT=扫地豁免），共 152 项，见
+  FmKit/src/main/resources/config.yml。
+- 旧配置键兼容：无 whitelist-mode 时按旧键 whitelist-enabled: true → EXEMPT
+  迁移；bins.valuable-items 键不再读取。

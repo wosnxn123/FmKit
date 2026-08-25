@@ -1,0 +1,467 @@
+# ============ FmKit 配置文件 ============
+
+# 扫地/收集（键名兼容原扫地插件）
+sweep:
+  enabled: true
+  clean-interval: 300
+  countdown-start: 60
+  countdown-times: [60, 30, 10, 5, 4, 3, 2, 1]
+  # 贵重物品清单：用于到期提醒“只提醒贵重”档的过滤（清单为空 = 该档静默跳过，可用 valuable-enabled 整体关闭）
+  valuable-enabled: true
+  valuable-items:
+    # ---- 史诗珍宝 ----
+    - ELYTRA
+    - DRAGON_EGG
+    - DRAGON_HEAD
+    - MACE
+    - HEAVY_CORE
+    # ---- 稀有珍宝 ----
+    - NETHER_STAR
+    - BEACON
+    - CONDUIT
+    - HEART_OF_THE_SEA
+    - TRIDENT
+    - ENCHANTED_GOLDEN_APPLE
+    - TOTEM_OF_UNDYING
+    - END_CRYSTAL
+    - ENCHANTED_BOOK
+    - SNIFFER_EGG
+    # ---- 下界合金 ----
+    - ANCIENT_DEBRIS
+    - NETHERITE_SCRAP
+    - NETHERITE_INGOT
+    - NETHERITE_UPGRADE_SMITHING_TEMPLATE
+    - NETHERITE_SWORD
+    - NETHERITE_PICKAXE
+    - NETHERITE_AXE
+    - NETHERITE_SHOVEL
+    - NETHERITE_HOE
+    - NETHERITE_HELMET
+    - NETHERITE_CHESTPLATE
+    - NETHERITE_LEGGINGS
+    - NETHERITE_BOOTS
+    # ---- 钻石与绿宝石（货币+全套装备） ----
+    - DIAMOND
+    - EMERALD
+    - DIAMOND_SWORD
+    - DIAMOND_PICKAXE
+    - DIAMOND_AXE
+    - DIAMOND_SHOVEL
+    - DIAMOND_HOE
+    - DIAMOND_HELMET
+    - DIAMOND_CHESTPLATE
+    - DIAMOND_LEGGINGS
+    - DIAMOND_BOOTS
+    # ---- 唱片与碎片（BOUNCE 仅 1.21.6+，低版本自动忽略） ----
+    - MUSIC_DISC_13
+    - MUSIC_DISC_CAT
+    - MUSIC_DISC_BLOCKS
+    - MUSIC_DISC_CHIRP
+    - MUSIC_DISC_FAR
+    - MUSIC_DISC_MALL
+    - MUSIC_DISC_MELLOHI
+    - MUSIC_DISC_STAL
+    - MUSIC_DISC_STRAD
+    - MUSIC_DISC_WARD
+    - MUSIC_DISC_11
+    - MUSIC_DISC_WAIT
+    - MUSIC_DISC_5
+    - MUSIC_DISC_RELIC
+    - MUSIC_DISC_CREATOR_MUSIC_BOX
+    - MUSIC_DISC_PRECIPICE
+    - MUSIC_DISC_TEARS
+    - MUSIC_DISC_PIGSTEP
+    - MUSIC_DISC_OTHERSIDE
+    - MUSIC_DISC_CREATOR
+    - MUSIC_DISC_LAVA_CHICKEN
+    - MUSIC_DISC_BOUNCE
+    - DISC_FRAGMENT_5
+    # ---- 生物头颅 ----
+    - SKELETON_SKULL
+    - WITHER_SKELETON_SKULL
+    - ZOMBIE_HEAD
+    - CREEPER_HEAD
+    - PIGLIN_HEAD
+    - PLAYER_HEAD
+    # ---- 潜影盒与壳 ----
+    - SHULKER_SHELL
+    - SHULKER_BOX
+    - WHITE_SHULKER_BOX
+    - ORANGE_SHULKER_BOX
+    - MAGENTA_SHULKER_BOX
+    - LIGHT_BLUE_SHULKER_BOX
+    - YELLOW_SHULKER_BOX
+    - LIME_SHULKER_BOX
+    - PINK_SHULKER_BOX
+    - GRAY_SHULKER_BOX
+    - LIGHT_GRAY_SHULKER_BOX
+    - CYAN_SHULKER_BOX
+    - PURPLE_SHULKER_BOX
+    - BLUE_SHULKER_BOX
+    - BROWN_SHULKER_BOX
+    - GREEN_SHULKER_BOX
+    - RED_SHULKER_BOX
+    - BLACK_SHULKER_BOX
+    # ---- 稀有装备与功能物 ----
+    - SADDLE
+    - NAME_TAG
+    - SPONGE
+    - DIAMOND_HORSE_ARMOR
+    - GOLDEN_HORSE_ARMOR
+    - IRON_HORSE_ARMOR
+    - CHAINMAIL_HELMET
+    - CHAINMAIL_CHESTPLATE
+    - CHAINMAIL_LEGGINGS
+    - CHAINMAIL_BOOTS
+    - EXPERIENCE_BOTTLE
+    - DRAGON_BREATH
+    - NAUTILUS_SHELL
+    - GOAT_HORN
+    - ECHO_SHARD
+    - RECOVERY_COMPASS
+    - OMINOUS_BOTTLE
+    - TRIAL_KEY
+    - OMINOUS_TRIAL_KEY
+    # ---- 锻造模板（盔甲纹饰） ----
+    - SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE
+    - DUNE_ARMOR_TRIM_SMITHING_TEMPLATE
+    - COAST_ARMOR_TRIM_SMITHING_TEMPLATE
+    - WILD_ARMOR_TRIM_SMITHING_TEMPLATE
+    - WARD_ARMOR_TRIM_SMITHING_TEMPLATE
+    - EYE_ARMOR_TRIM_SMITHING_TEMPLATE
+    - VEX_ARMOR_TRIM_SMITHING_TEMPLATE
+    - TIDE_ARMOR_TRIM_SMITHING_TEMPLATE
+    - SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE
+    - RIB_ARMOR_TRIM_SMITHING_TEMPLATE
+    - SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE
+    - WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE
+    - SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE
+    - SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE
+    - RAISER_ARMOR_TRIM_SMITHING_TEMPLATE
+    - HOST_ARMOR_TRIM_SMITHING_TEMPLATE
+    - FLOW_ARMOR_TRIM_SMITHING_TEMPLATE
+    - BOLT_ARMOR_TRIM_SMITHING_TEMPLATE
+    # ---- 纹饰陶片 ----
+    - ANGLER_POTTERY_SHERD
+    - ARCHER_POTTERY_SHERD
+    - ARMS_UP_POTTERY_SHERD
+    - BLADE_POTTERY_SHERD
+    - BREWER_POTTERY_SHERD
+    - BURN_POTTERY_SHERD
+    - DANGER_POTTERY_SHERD
+    - EXPLORER_POTTERY_SHERD
+    - FLOW_POTTERY_SHERD
+    - FRIEND_POTTERY_SHERD
+    - GUSTER_POTTERY_SHERD
+    - HEART_POTTERY_SHERD
+    - HEARTBREAK_POTTERY_SHERD
+    - HOWL_POTTERY_SHERD
+    - MINER_POTTERY_SHERD
+    - MOURNER_POTTERY_SHERD
+    - PLENTY_POTTERY_SHERD
+    - PRIZE_POTTERY_SHERD
+    - SCRAPE_POTTERY_SHERD
+    - SHEAF_POTTERY_SHERD
+    - SHELTER_POTTERY_SHERD
+    - SKULL_POTTERY_SHERD
+    - SNORT_POTTERY_SHERD
+    # ---- 旗帜图案 ----
+    - CREEPER_BANNER_PATTERN
+    - SNOUT_BANNER_PATTERN
+    - FLOW_BANNER_PATTERN
+    - GUSTER_BANNER_PATTERN
+    - SKULL_CHARGE_BANNER_PATTERN
+    - THING_BANNER_PATTERN
+  # 扫地忽略清单：命中的地面物品不扫、自然消失（默认关闭；默认内容与贵重清单一致，两表独立可分别增删）
+  ignore:
+    enabled: false
+    items:
+      # ---- 史诗珍宝 ----
+      - ELYTRA
+      - DRAGON_EGG
+      - DRAGON_HEAD
+      - MACE
+      - HEAVY_CORE
+      # ---- 稀有珍宝 ----
+      - NETHER_STAR
+      - BEACON
+      - CONDUIT
+      - HEART_OF_THE_SEA
+      - TRIDENT
+      - ENCHANTED_GOLDEN_APPLE
+      - TOTEM_OF_UNDYING
+      - END_CRYSTAL
+      - ENCHANTED_BOOK
+      - SNIFFER_EGG
+      # ---- 下界合金 ----
+      - ANCIENT_DEBRIS
+      - NETHERITE_SCRAP
+      - NETHERITE_INGOT
+      - NETHERITE_UPGRADE_SMITHING_TEMPLATE
+      - NETHERITE_SWORD
+      - NETHERITE_PICKAXE
+      - NETHERITE_AXE
+      - NETHERITE_SHOVEL
+      - NETHERITE_HOE
+      - NETHERITE_HELMET
+      - NETHERITE_CHESTPLATE
+      - NETHERITE_LEGGINGS
+      - NETHERITE_BOOTS
+      # ---- 钻石与绿宝石（货币+全套装备） ----
+      - DIAMOND
+      - EMERALD
+      - DIAMOND_SWORD
+      - DIAMOND_PICKAXE
+      - DIAMOND_AXE
+      - DIAMOND_SHOVEL
+      - DIAMOND_HOE
+      - DIAMOND_HELMET
+      - DIAMOND_CHESTPLATE
+      - DIAMOND_LEGGINGS
+      - DIAMOND_BOOTS
+      # ---- 唱片与碎片（BOUNCE 仅 1.21.6+，低版本自动忽略） ----
+      - MUSIC_DISC_13
+      - MUSIC_DISC_CAT
+      - MUSIC_DISC_BLOCKS
+      - MUSIC_DISC_CHIRP
+      - MUSIC_DISC_FAR
+      - MUSIC_DISC_MALL
+      - MUSIC_DISC_MELLOHI
+      - MUSIC_DISC_STAL
+      - MUSIC_DISC_STRAD
+      - MUSIC_DISC_WARD
+      - MUSIC_DISC_11
+      - MUSIC_DISC_WAIT
+      - MUSIC_DISC_5
+      - MUSIC_DISC_RELIC
+      - MUSIC_DISC_CREATOR_MUSIC_BOX
+      - MUSIC_DISC_PRECIPICE
+      - MUSIC_DISC_TEARS
+      - MUSIC_DISC_PIGSTEP
+      - MUSIC_DISC_OTHERSIDE
+      - MUSIC_DISC_CREATOR
+      - MUSIC_DISC_LAVA_CHICKEN
+      - MUSIC_DISC_BOUNCE
+      - DISC_FRAGMENT_5
+      # ---- 生物头颅 ----
+      - SKELETON_SKULL
+      - WITHER_SKELETON_SKULL
+      - ZOMBIE_HEAD
+      - CREEPER_HEAD
+      - PIGLIN_HEAD
+      - PLAYER_HEAD
+      # ---- 潜影盒与壳 ----
+      - SHULKER_SHELL
+      - SHULKER_BOX
+      - WHITE_SHULKER_BOX
+      - ORANGE_SHULKER_BOX
+      - MAGENTA_SHULKER_BOX
+      - LIGHT_BLUE_SHULKER_BOX
+      - YELLOW_SHULKER_BOX
+      - LIME_SHULKER_BOX
+      - PINK_SHULKER_BOX
+      - GRAY_SHULKER_BOX
+      - LIGHT_GRAY_SHULKER_BOX
+      - CYAN_SHULKER_BOX
+      - PURPLE_SHULKER_BOX
+      - BLUE_SHULKER_BOX
+      - BROWN_SHULKER_BOX
+      - GREEN_SHULKER_BOX
+      - RED_SHULKER_BOX
+      - BLACK_SHULKER_BOX
+      # ---- 稀有装备与功能物 ----
+      - SADDLE
+      - NAME_TAG
+      - SPONGE
+      - DIAMOND_HORSE_ARMOR
+      - GOLDEN_HORSE_ARMOR
+      - IRON_HORSE_ARMOR
+      - CHAINMAIL_HELMET
+      - CHAINMAIL_CHESTPLATE
+      - CHAINMAIL_LEGGINGS
+      - CHAINMAIL_BOOTS
+      - EXPERIENCE_BOTTLE
+      - DRAGON_BREATH
+      - NAUTILUS_SHELL
+      - GOAT_HORN
+      - ECHO_SHARD
+      - RECOVERY_COMPASS
+      - OMINOUS_BOTTLE
+      - TRIAL_KEY
+      - OMINOUS_TRIAL_KEY
+      # ---- 锻造模板（盔甲纹饰） ----
+      - SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE
+      - DUNE_ARMOR_TRIM_SMITHING_TEMPLATE
+      - COAST_ARMOR_TRIM_SMITHING_TEMPLATE
+      - WILD_ARMOR_TRIM_SMITHING_TEMPLATE
+      - WARD_ARMOR_TRIM_SMITHING_TEMPLATE
+      - EYE_ARMOR_TRIM_SMITHING_TEMPLATE
+      - VEX_ARMOR_TRIM_SMITHING_TEMPLATE
+      - TIDE_ARMOR_TRIM_SMITHING_TEMPLATE
+      - SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE
+      - RIB_ARMOR_TRIM_SMITHING_TEMPLATE
+      - SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE
+      - WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE
+      - SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE
+      - SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE
+      - RAISER_ARMOR_TRIM_SMITHING_TEMPLATE
+      - HOST_ARMOR_TRIM_SMITHING_TEMPLATE
+      - FLOW_ARMOR_TRIM_SMITHING_TEMPLATE
+      - BOLT_ARMOR_TRIM_SMITHING_TEMPLATE
+      # ---- 纹饰陶片 ----
+      - ANGLER_POTTERY_SHERD
+      - ARCHER_POTTERY_SHERD
+      - ARMS_UP_POTTERY_SHERD
+      - BLADE_POTTERY_SHERD
+      - BREWER_POTTERY_SHERD
+      - BURN_POTTERY_SHERD
+      - DANGER_POTTERY_SHERD
+      - EXPLORER_POTTERY_SHERD
+      - FLOW_POTTERY_SHERD
+      - FRIEND_POTTERY_SHERD
+      - GUSTER_POTTERY_SHERD
+      - HEART_POTTERY_SHERD
+      - HEARTBREAK_POTTERY_SHERD
+      - HOWL_POTTERY_SHERD
+      - MINER_POTTERY_SHERD
+      - MOURNER_POTTERY_SHERD
+      - PLENTY_POTTERY_SHERD
+      - PRIZE_POTTERY_SHERD
+      - SCRAPE_POTTERY_SHERD
+      - SHEAF_POTTERY_SHERD
+      - SHELTER_POTTERY_SHERD
+      - SKULL_POTTERY_SHERD
+      - SNORT_POTTERY_SHERD
+      # ---- 旗帜图案 ----
+      - CREEPER_BANNER_PATTERN
+      - SNOUT_BANNER_PATTERN
+      - FLOW_BANNER_PATTERN
+      - GUSTER_BANNER_PATTERN
+      - SKULL_CHARGE_BANNER_PATTERN
+      - THING_BANNER_PATTERN
+  excluded-worlds: []        # 不参与扫地的世界名（不区分大小写）
+  clean-experience-orbs: false
+  threshold-cleaning:
+    enabled: false
+    threshold: 500
+    check-interval: 30
+
+# 个人回收开关
+collect:
+  enabled: true          # 总开关：私人箱收集（死亡标记+扫地分流）
+  default: true          # 每位玩家回收开关初始值（/fmkit toggle 或 GUI 槽2 可改）
+  on-death: true       # 死亡掉落是否收进私人回收站
+
+# 回收站
+bins:
+  private-ttl-days: 3        # 游戏日（1游戏日=20分钟）
+  public-ttl-days: 7
+  private-max-entries: 0     # 私人箱容量，0=不限；满则最旧条目提前转公共
+  public-max-entries: 512    # 公共箱容量，满则淘汰最旧；0=不限
+  expiry-scan-interval: 60   # 到期流转/清理扫描周期（秒）
+  move-notify: VALUABLE      # 到期提醒初始档：OFF | VALUABLE | ALL（旧 true=ALL / false=OFF 仍兼容）
+  move-notify-mode: ACTIONBAR  # ACTIONBAR | CHAT
+  notify-max-shown: 3        # 到期提醒最多按名展示几种物品，0=只报数量
+  expiry-warn-seconds: 60    # 到期前 N 秒发一次倒计时提醒，0=关闭
+  expiry-preview-minutes: 10 # 到期预览按钮的时间窗（分钟）
+  expiry-destroy: false      # 到期去向初始值：到期后自动销毁（私人箱槽5 按玩家可切换）
+  destroy-confirm-seconds: 3 # 销毁两步确认窗口（秒）
+
+# GUI
+gui:
+  sounds: true
+  auto-refresh-seconds: 2    # GUI 打开期间自动重绘周期（秒），倒计时/悬停预览保持新鲜；0=关闭
+  frame-material: GRAY_STAINED_GLASS_PANE
+  dark-bar-material: BLACK_STAINED_GLASS_PANE
+  icons:
+    banner: WRITABLE_BOOK
+    toggle-on: LIME_CONCRETE
+    toggle-off: RED_CONCRETE
+    expiry-to-public: CHEST
+    expiry-destroy: FIRE_CHARGE
+    switch-to-public: CHEST
+    switch-to-private: ENDER_CHEST
+    prev-page: ARROW
+    next-page: ARROW
+    page-indicator: PAPER
+    refresh: CLOCK
+    take-all: LIME_SHULKER_BOX
+    sort: HOPPER
+    hub-private: ENDER_CHEST
+    hub-public: CHEST
+    notify-valuable: YELLOW_CONCRETE
+    preview: SPYGLASS
+
+# 管理
+admin:
+  clearpublic-confirm-seconds: 10
+
+# 文案（MiniMessage）
+messages:
+  prefix: "<gray>[<aqua>回收站</aqua>]</gray> "
+  countdown: "<red><bold>警告：</bold></red><white>{s} 秒后将开始扫地，掉落物会收入回收站</white>"
+  cleaned: "<green>✔ 扫地完成：</green><white>收集了 <aqua>{n}</aqua> 个掉落物（共 <aqua>{m}</aqua> 件物品）进回收站</white>"
+  bag-full: "背包空间不足，取回已取消"
+  no-permission: "没有权限"
+  entry-gone: "该条目已不存在"
+  entry-expired: "<yellow>该条目已到期，将按到期设置处理</yellow>"
+  destroyed: "<gray>已销毁：</gray><white>{item}</white>"
+  moved-to-public: "<gray>已移入公共回收站：</gray><white>{item}</white>"
+  destroy-confirm: "<red>{s} 秒内再次 Shift+右键 确认销毁</red>"
+  move-notify: "你回收站里的 {items} 已被移入公共回收站"
+  notify-on: "<green>到期提醒已开启</green>"
+  notify-off: "<yellow>到期提醒已关闭</yellow>"
+  notify-valuable: "<gold>到期提醒：只提醒贵重物品</gold>"
+  expiry-mode-destroy: "<red>到期去向：自动销毁</red>"
+  expiry-mode-public: "<gold>到期去向：转公共回收站</gold>"
+  expiry-destroyed: "你回收站里的 {items} 已到期销毁"
+  expiry-warn-public: "<yellow>{item} 将在 {s} 秒后转入公共回收站</yellow>"
+  expiry-warn-destroy: "<yellow>{item} 将在 {s} 秒后销毁</yellow>"
+  toggle-on: "<green>回收已开启：丢弃/死亡掉落将进入你的私人回收站</green>"
+  toggle-off: "<yellow>回收已关闭：丢弃/死亡掉落原版落地，扫到将进公共箱</yellow>"
+  toggle-current: "当前回收开关：{state}"
+  clearpublic-confirm: "<red>公共箱共 {n} 条，{s} 秒内再执行一次以确认清空</red>"
+  clearpublic-done: "<green>已清空公共回收站，共 {n} 条</green>"
+  clear-player-done: "<green>已清空 {player} 的私人回收站，共 {n} 条</green>"
+  public-taken: "<green>已从公共回收站取走物品</green>"
+  taken-back: "<green>已取回：</green><white>{item}</white>"
+  taken-all-public: "<green>已从公共回收站取走 <aqua>{n}</aqua> 件物品</green>"
+  reload-done: "配置已重载"
+  sweep-on: "扫地已开启"
+  sweep-off: "扫地已暂停"
+  sweep-now: "<green>已触发立即扫地</green>"
+  interval-set: "<green>清理间隔已设为 <aqua>{s}</aqua> 秒</green>"
+  list-header: "<aqua><bold>{list}</bold></aqua> {state} · <white>{n}</white> 种"
+  list-empty: "<gray>（空）</gray>"
+  list-add: "<green>已加入{list}：{item}</green>"
+  list-add-dup: "<yellow>{item} 已在{list}中</yellow>"
+  list-remove: "<green>已移出{list}：{item}</green>"
+  list-remove-missing: "<yellow>{list}中没有 {item}</yellow>"
+  list-clear: "<green>已清空{list}</green>"
+  list-bad-item: "<red>未知物品：{item}</red>"
+  list-on: "<green>{list}已启用</green>"
+  list-off: "<yellow>{list}已关闭</yellow>"
+  notify-set: "<green>已将 {player} 的到期提醒设为 {mode}</green>"
+  destroy-set: "<green>已将 {player} 的到期去向设为 {mode}</green>"
+  player-not-found: "找不到玩家：{player}"
+  hub-title: "<aqua><bold>回收站</bold></aqua>"
+  private-title: "<green><bold>你的回收箱</bold></green> <gray>·</gray> <white>{n}</white> 件"
+  public-title: "<gold><bold>公共回收箱</bold></gold> <gray>·</gray> <white>{n}</white> 件"
+  lore-drop-time: "<gray>丢弃时间：{time}</gray>"
+  lore-expiry: "{color}{t} 后转入公共"
+  lore-delete: "{color}{t} 后删除"
+  lore-owner: "<gray>原主人：{name}</gray>"
+  lore-no-owner: "<gray>原主人：无主</gray>"
+  lore-hint-private: "<dark_gray>左键取回 · 右键立即转公共 · Shift右键销毁</dark_gray>"
+  lore-hint-public: "<dark_gray>左键拿走 · 先到先得</dark_gray>"
+  preview-title: "<aqua><bold>即将到期（{m} 分钟内）</bold></aqua>"
+  preview-line: "<white>{item}</white> <dark_gray>·</dark_gray> <gray>剩 {t}</gray> <dark_gray>·</dark_gray> {dest}"
+  preview-more: "<gray>还有 {n} 件，略</gray>"
+  preview-empty: "<gray>{m} 分钟内没有即将到期的物品</gray>"
+  preview-name: "<aqua>到期预览</aqua>"
+  preview-lore: "<gray>查看 {m} 分钟内即将到期的物品</gray>"
+  preview-hover-line: "<gray>- {item} ×{n}</gray> <dark_gray>·</dark_gray> {color}剩 {t}"
+  preview-hover-more: "<dark_gray>…还有 {n} 条</dark_gray>"
+  preview-hover-empty: "<dark_gray>{m} 分钟内无到期</dark_gray>"
+  preview-dest-public: "<gold>到期转公共</gold>"
+  preview-dest-destroy: "<red>到期销毁</red>"

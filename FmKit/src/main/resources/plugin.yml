@@ -1,0 +1,23 @@
+name: FmKit
+version: 1.0.0
+main: dev.fm.kit.FmKitPlugin
+api-version: '26.1'
+folia-supported: true
+description: Sweeps ground items into private/public recycle bins instead of deleting them.
+author: Fm
+commands:
+  fmkit:
+    description: Open the recycle bin menu.
+    permission: fmkit.use
+    usage: /<command> [private|public|toggle [on|off]|help]
+  fmkitadmin:
+    description: FmKit admin commands.
+    permission: fmkit.admin
+    usage: /<command> <clearpublic|clear <player>|bin <player>|reload|sweep <on|off|now>|interval <seconds>|whitelist [add|remove|clear]|toggle <player> <on|off>|status|help>
+permissions:
+  fmkit.use:
+    description: Use the recycle bins.
+    default: true
+  fmkit.admin:
+    description: Manage FmKit.
+    default: op

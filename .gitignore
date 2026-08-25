@@ -1,0 +1,23 @@
+# ---- 构建产物 ----
+target/
+FmKit/target/
+*.class
+
+# ---- Node（测试套件） ----
+bot/node_modules/
+
+# ---- 本地测试服务端（世界数据/服务端二进制，不随源码发布） ----
+servers/
+
+# ---- 独立项目，不属于本仓库 ----
+FmTerm/
+
+# ---- 草稿素材 ----
+FmKit/2e4d7f0d016926d1161ee732bd1811c3.png
+
+# ---- IDE / 系统 ----
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
