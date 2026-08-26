@@ -14,16 +14,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * All players' private bins. Persisted as plugins/FmKit/bins/private/&lt;uuid&gt;.yml.
- * Mutations synchronize on the owning PrivateBin; file writes go through the async scheduler.
+ * Mutations synchronize on the owning PrivateBin; file writes go through one ordered
+ * single-thread executor, so saves of the same player file never interleave.
  */
 public final class PrivateBinStore {
 
     private final FmKitPlugin plugin;
     private final Map<UUID, PrivateBin> bins = new ConcurrentHashMap<>();
     private final Map<UUID, String> knownNames = new ConcurrentHashMap<>();
+    /** Ordered single-thread writer: saves for one player file never interleave. */
+    private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "fmkit-store-io");
+        t.setDaemon(true);
+        return t;
+    });
 
     public PrivateBinStore(FmKitPlugin plugin) {
         this.plugin = plugin;
@@ -138,8 +148,13 @@ public final class PrivateBinStore {
                 int max = plugin.settings().privateMaxEntries();
                 if (max > 0 && bin.entries().size() > max) {
                     BinEntry oldest = bin.entries().remove(0);
+                    plugin.binLogger().privateOverflow(uuid, oldest, bin.entries().size() + 1, max);
                     plugin.publicStore().add(oldest.renewedForPublic(plugin.settings().publicTtlMs()));
                 }
+            }
+            int capMax = plugin.settings().privateMaxEntries();
+            if (capMax <= 0 || bin.entries().size() < capMax) {
+                plugin.binLogger().privateBelowCap(uuid);
             }
         }
         saveAsync(uuid);
@@ -256,7 +271,7 @@ public final class PrivateBinStore {
             y = toYaml(bin);
         }
         File f = file(uuid);
-        Bukkit.getAsyncScheduler().runNow(plugin, t -> {
+        io.execute(() -> {
             try {
                 y.save(f);
             } catch (IOException ex) {
@@ -291,6 +306,18 @@ public final class PrivateBinStore {
             } catch (IOException ex) {
                 plugin.getLogger().warning("保存失败 " + en.getKey() + ": " + ex.getMessage());
             }
+        }
+    }
+
+    /** Drain the writer before the final synchronous saves in onDisable. */
+    public void shutdown() {
+        io.shutdown();
+        try {
+            if (!io.awaitTermination(10, TimeUnit.SECONDS)) {
+                plugin.getLogger().warning("私人箱写入器未在 10 秒内排空");
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
         }
     }
 }

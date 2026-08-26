@@ -221,6 +221,7 @@ public final class FmKitAdminCommand implements TabExecutor {
         Long deadline = clearPublicPending.remove(key);
         if (deadline != null && now < deadline) {
             int n = plugin.publicStore().clear();
+            plugin.getLogger().info("[管理员操作] " + sender.getName() + " 清空了公共回收站，共 " + n + " 条");
             TextUtil.send(sender, TextUtil.apply(cfg.prefixed("clearpublic-done"), "n", String.valueOf(n)));
             return;
         }
@@ -238,6 +239,7 @@ public final class FmKitAdminCommand implements TabExecutor {
         String name = args[1];
         resolveUuid(name, uuid -> {
             int n = plugin.privateStore().clear(uuid);
+            plugin.getLogger().info("[管理员操作] " + sender.getName() + " 清空了玩家 " + name + " 的私人箱，共 " + n + " 条");
             TextUtil.send(sender, TextUtil.apply(plugin.settings().prefixed("clear-player-done"),
                     "player", name, "n", String.valueOf(n)));
         }, () -> TextUtil.send(sender, TextUtil.apply(plugin.settings().prefixed("player-not-found"), "player", name)));

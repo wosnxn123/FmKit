@@ -3,6 +3,7 @@ package dev.fm.kit;
 import dev.fm.kit.bin.BinExpiryTask;
 import dev.fm.kit.bin.PrivateBinStore;
 import dev.fm.kit.bin.PublicBinStore;
+import dev.fm.kit.bin.BinLogger;
 import dev.fm.kit.cleaner.DeathDropHandler;
 import dev.fm.kit.cleaner.SweepScheduler;
 import dev.fm.kit.command.FmKitAdminCommand;
@@ -23,6 +24,7 @@ public final class FmKitPlugin extends JavaPlugin {
     private PublicBinStore publicStore;
     private SweepScheduler sweep;
     private BinExpiryTask expiry;
+    private BinLogger binLogger;
 
     public static FmKitPlugin instance() {
         return instance;
@@ -36,6 +38,7 @@ public final class FmKitPlugin extends JavaPlugin {
 
         privateStore = new PrivateBinStore(this);
         publicStore = new PublicBinStore(this);
+        binLogger = new BinLogger(this);
         publicStore.load();
         privateStore.loadAll();
         getLogger().info("已加载私人箱 " + privateStore.bins().size() + " 位玩家 / "
@@ -74,9 +77,11 @@ public final class FmKitPlugin extends JavaPlugin {
             expiry.stop();
         }
         if (privateStore != null) {
+            privateStore.shutdown();
             privateStore.saveAllSync();
         }
         if (publicStore != null) {
+            publicStore.shutdown();
             publicStore.saveSync();
         }
         instance = null;
@@ -104,5 +109,9 @@ public final class FmKitPlugin extends JavaPlugin {
 
     public SweepScheduler sweep() {
         return sweep;
+    }
+
+    public BinLogger binLogger() {
+        return binLogger;
     }
 }

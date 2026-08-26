@@ -7,6 +7,6 @@ $srcs = (Get-ChildItem "$root\src\main\java" -Recurse -Filter *.java).FullName
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Copy-Item "$root\src\main\resources\config.yml" "$root\target\classes\config.yml" -Force
 Copy-Item "$root\src\main\resources\plugin.yml" "$root\target\classes\plugin.yml" -Force
-& jar uf "$root\target\FmKit-1.0.0.jar" -C "$root\target\classes" .
+& jar uf "$root\target\FmKit-1.1.0.jar" -C "$root\target\classes" .
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Output "BUILD_OK"

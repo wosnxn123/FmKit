@@ -66,6 +66,7 @@ plugins/FmKit/
   bins/private/<uuid>.yml   # 每个玩家一个文件，离线也可清理/流转
   bins/public.yml           # 公共
 ```
+- **写入顺序**：存储为每箱组（私人/公共）单线程写入器；同一玩家的多次写入按提交顺序串行落盘（后写不丢旧数据），不同玩家互不阻塞。
 
 ### 时间与"游戏日"
 - 1 游戏日 = 20 分钟真实时间（24000 tick）。
@@ -174,6 +175,14 @@ plugins/FmKit/
 - 音效可关；边框/标题/槽位/文案全进 config。
 - 回收站是普通箱子 GUI，可正常关闭（无需 FmTerm 那种强制重开）。
 
+### 7.5 取回与重渲染规则（1.1）
+- **全部取回统一最旧优先**：公共/私人按存入时间全局排序（跨页），不再"当前页优先"。
+- **满包不阻断**：全部取回遇到无剩余空间的条目跳过继续；一件都没取到才发 `bag-full`。
+- **部分取回**：左键取回可堆叠物品时背包空间不足，能拿多少拿多少，条目数量相应减少（旧行为是整体取消）。
+- **管理员查看**：`/fmkitadmin bin <player>` 打开他人私人箱，标题加「（管理员查看）」，到期提醒槽位标注箱主名。
+- **1 秒差量刷新**：打开期间按 `gui.auto-refresh-seconds` 周期重渲染；条目 id 未变只更新倒计时行，内容变化才整槽重绘。
+- 销毁音效只在两步确认实际销毁时播放。
+
 ---
 
 ## 8. 指令与权限
@@ -251,10 +260,16 @@ bins:
   expiry-preview-minutes: 10 # 槽7 到期预览窗口（实际分钟）
   expiry-destroy: false      # 新玩家到期去向初始值：true=销毁 / false=转公共
   destroy-confirm-seconds: 3 # 销毁两步确认窗口（秒）
+  log:                         # 控制台箱日志（仅后台输出，不打扰玩家）
+    overflow: episode          # off|episode|window|each  容量溢出（私人转公共/公共淘汰）；episode=每次溢出期只记一行
+    public-expire: off         # off|window|each          公共箱到期清理；window=每 60 秒聚合成一行
+    private-expire: off        # off|window|each          私人箱到期转公共（到期销毁不受此开关控制，总是记录）
+    sweep-deposit: off         # off|window|each          扫地入库汇总（每轮一行）
 
 # ============ GUI ============
 gui:
   sounds: true
+  auto-refresh-seconds: 1      # GUI 打开期间自动重绘周期（秒）；0=关闭
   frame-material: GRAY_STAINED_GLASS_PANE   # 边框
   dark-bar-material: BLACK_STAINED_GLASS_PANE   # 第 1 页顶行深色板
   icons:                                     # 各按钮/标记图标，均可换
@@ -296,7 +311,7 @@ messages:
   clear-player-done: "<green>已清空 {player} 的私人回收站，共 {n} 条</green>"
   public-taken: "<green>已从公共回收站取走物品</green>"
   hub-title: "<aqua><bold>回收站</bold></aqua>"
-  private-title: "<green><bold>你的回收箱</bold></green> <gray>·</gray> <white>{n}</white> 件 <gray>·</gray> <yellow>{t}</yellow> 后转公共"
+  private-title: "<green><bold>你的回收箱</bold></green> <gray>·</gray> <white>{n}</white> 件"
   public-title: "<gold><bold>公共回收箱</bold></gold> <gray>·</gray> <white>{n}</white> 件"
   lore-drop-time: "<gray>丢弃时间：{time}</gray>"
   lore-expiry: "<gray>{t} 后转入公共</gray>"
@@ -309,7 +324,7 @@ messages:
   # 以下新增键在 Settings.FALLBACK_MESSAGES 有默认，config 缺省亦可：
   # sweep-now, interval-set, list-header/list-empty/list-add/list-add-dup/list-remove/list-remove-missing/
   # list-clear/list-bad-item/list-on/list-off, notify-set, destroy-set, notify-on/notify-off/notify-valuable,
-  # expiry-mode-destroy/expiry-mode-public, taken-back, taken-all-public, expiry-warn-public/expiry-warn-destroy,
+  # expiry-mode-destroy/expiry-mode-public, taken-back, taken-all-public, taken-all-private, private-title-viewing, expiry-warn-public/expiry-warn-destroy,
   # preview-name/preview-lore/preview-title/preview-line/preview-more/preview-empty/preview-dest-public/preview-dest-destroy
 ```
 

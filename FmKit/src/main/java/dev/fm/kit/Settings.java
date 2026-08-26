@@ -1,6 +1,7 @@
 package dev.fm.kit;
 
 import dev.fm.kit.util.TimeUtil;
+import dev.fm.kit.bin.BinLogger;
 import dev.fm.kit.bin.NotifyMode;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -273,6 +274,27 @@ public final class Settings {
         return Math.max(1, cfg.getInt("bins.destroy-confirm-seconds", 3));
     }
 
+    // ---- bin log (console only, see BinLogger) ----
+    /** Capacity overflow (eviction/transfer) logging: off|episode|window|each. */
+    public BinLogger.Mode logOverflowMode() {
+        return BinLogger.Mode.parse(cfg.getString("bins.log.overflow"), BinLogger.Mode.EPISODE);
+    }
+
+    /** Public bin expiry purge logging: off|window|each. */
+    public BinLogger.Mode logPublicExpireMode() {
+        return BinLogger.Mode.parse(cfg.getString("bins.log.public-expire"), BinLogger.Mode.OFF);
+    }
+
+    /** Private bin expiry move/destroy logging: off|each. */
+    public BinLogger.Mode logPrivateExpireMode() {
+        return BinLogger.Mode.parse(cfg.getString("bins.log.private-expire"), BinLogger.Mode.OFF);
+    }
+
+    /** Sweep round deposit summary logging: off|each. */
+    public BinLogger.Mode logSweepDepositMode() {
+        return BinLogger.Mode.parse(cfg.getString("bins.log.sweep-deposit"), BinLogger.Mode.OFF);
+    }
+
     // ---- gui ----
     public boolean sounds() {
         return cfg.getBoolean("gui.sounds", true);
@@ -295,7 +317,7 @@ public final class Settings {
 
     /** Live re-render period (seconds) while a GUI window is open; 0 disables. */
     public int guiAutoRefreshSeconds() {
-        return Math.max(0, cfg.getInt("gui.auto-refresh-seconds", 2));
+        return Math.max(0, cfg.getInt("gui.auto-refresh-seconds", 1));
     }
 
     // ---- admin ----
@@ -350,5 +372,7 @@ public final class Settings {
             Map.entry("preview-dest-destroy", "<red>到期销毁</red>"),
             Map.entry("preview-hover-line", "<gray>- {item} ×{n}</gray> <dark_gray>·</dark_gray> {color}剩 {t}"),
             Map.entry("preview-hover-more", "<dark_gray>…还有 {n} 条</dark_gray>"),
+            Map.entry("taken-all-private", "<green>已按存入顺序取回 <aqua>{n}</aqua> 件物品</green>"),
+            Map.entry("private-title-viewing", "<green><bold>{player} 的回收箱</bold></green> <gray>·</gray> <white>{n}</white> 件 <dark_gray>（管理员查看）</dark_gray>"),
             Map.entry("preview-hover-empty", "<dark_gray>{m} 分钟内无到期</dark_gray>"));
 }

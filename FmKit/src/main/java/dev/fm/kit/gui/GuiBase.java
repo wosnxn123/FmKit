@@ -6,12 +6,14 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /** Shared layout constants and item helpers for the 54-slot bin pages. */
@@ -156,21 +158,44 @@ public final class GuiBase {
         return is;
     }
 
-    /** Full-fit check before taking an entry into the player inventory. */
-    public static boolean canFit(PlayerInventory inv, ItemStack stack) {
-        int remaining = stack.getAmount();
+    /** How many items of the stack fit into the player's storage slots. */
+    public static int maxFit(PlayerInventory inv, ItemStack stack) {
         int max = Math.min(stack.getMaxStackSize(), inv.getMaxStackSize());
+        int space = 0;
         for (ItemStack is : inv.getStorageContents()) {
             if (is == null || is.getType().isAir()) {
-                remaining -= max;
+                space += max;
             } else if (is.isSimilar(stack)) {
-                remaining -= Math.max(0, max - is.getAmount());
+                space += Math.max(0, max - is.getAmount());
             }
-            if (remaining <= 0) {
-                return true;
+            if (space >= stack.getAmount()) {
+                return stack.getAmount();
             }
         }
-        return remaining <= 0;
+        return Math.min(space, stack.getAmount());
+    }
+
+    /** Full-fit check before taking an entry into the player inventory. */
+    public static boolean canFit(PlayerInventory inv, ItemStack stack) {
+        return maxFit(inv, stack) >= stack.getAmount();
+    }
+
+    /** Diff-applies a fully rendered frame; only changed slots are re-sent to the client. */
+    public static void apply(GuiSession s, ItemStack[] desired) {
+        Inventory inv = s.inv;
+        for (int i = 0; i < desired.length; i++) {
+            if (!Objects.equals(inv.getItem(i), desired[i])) {
+                inv.setItem(i, desired[i]);
+            }
+        }
+    }
+
+    /** Take {@code count} items off the stack; the passed stack becomes the remainder. */
+    public static ItemStack split(ItemStack stack, int count) {
+        ItemStack taken = stack.clone();
+        taken.setAmount(count);
+        stack.setAmount(stack.getAmount() - count);
+        return taken;
     }
 
     public static void sound(Player p, FmKitPlugin plugin, Sound s) {

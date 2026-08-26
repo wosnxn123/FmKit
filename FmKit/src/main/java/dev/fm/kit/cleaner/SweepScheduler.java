@@ -145,9 +145,11 @@ public final class SweepScheduler {
         AtomicInteger collected = new AtomicInteger();
         AtomicInteger amount = new AtomicInteger();
         AtomicInteger remaining = new AtomicInteger(1);
+        AtomicInteger publicCount = new AtomicInteger();
         Runnable done = () -> {
             if (remaining.decrementAndGet() == 0) {
                 cleaning.set(false);
+                plugin.binLogger().sweepRound(collected.get(), amount.get(), publicCount.get());
                 TextUtil.broadcast(TextUtil.apply(s.msg("cleaned"),
                         "n", String.valueOf(collected.get()), "m", String.valueOf(amount.get())));
             }
@@ -205,6 +207,7 @@ public final class SweepScheduler {
                             // first at capacity.
                             plugin.publicStore().add(new BinEntry(BinEntry.newId(), stack.clone(), ownerName,
                                     now, now + publicTtl, -(long) item.getTicksLived()));
+                            publicCount.incrementAndGet();
                         }
                         collected.incrementAndGet();
                         amount.addAndGet(stack.getAmount());

@@ -13,6 +13,7 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
+import org.bukkit.inventory.ItemStack;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -43,27 +44,36 @@ public final class PrivateGui {
         GuiSession s = new GuiSession(plugin, viewer, GuiSession.View.PRIVATE);
         s.target = target;
         s.sort = GuiSession.Sort.EXPIRING;
-        s.inv = Bukkit.createInventory(s, 54, title(plugin, target));
+        s.inv = Bukkit.createInventory(s, 54, title(plugin, viewer, target));
         render(s);
         viewer.openInventory(s.inv);
         GuiBase.startAutoRefresh(s);
     }
 
-    private static Component title(FmKitPlugin plugin, UUID target) {
-        return TextUtil.mini(TextUtil.apply(plugin.settings().msg("private-title"),
-                "n", String.valueOf(plugin.privateStore().size(target))));
+    private static Component title(FmKitPlugin plugin, Player viewer, UUID target) {
+        int n = plugin.privateStore().size(target);
+        if (viewer.getUniqueId().equals(target)) {
+            return TextUtil.mini(TextUtil.apply(plugin.settings().msg("private-title"),
+                    "n", String.valueOf(n)));
+        }
+        String name = plugin.privateStore().knownName(target);
+        if (name == null) {
+            name = target.toString().substring(0, 8);
+        }
+        return TextUtil.mini(TextUtil.apply(plugin.settings().msg("private-title-viewing"),
+                "player", name, "n", String.valueOf(n)));
     }
 
     static void render(GuiSession s) {
         var plugin = s.plugin;
         var cfg = plugin.settings();
-        s.inv.clear();
+        ItemStack[] d = new ItemStack[54];
         for (int i = 0; i < 54; i++) {
-            s.inv.setItem(i, GuiBase.pane(cfg.frameMaterial()));
+            d[i] = GuiBase.pane(cfg.frameMaterial());
         }
         if (s.page == 0) {
             for (int i : GuiBase.darkBarSlots(GuiSession.View.PRIVATE)) {
-                s.inv.setItem(i, GuiBase.pane(cfg.darkBarMaterial()));
+                d[i] = GuiBase.pane(cfg.darkBarMaterial());
             }
         }
 
@@ -96,29 +106,29 @@ public final class PrivateGui {
                     "color", expiryColor(left, cfg.privateTtlMs()),
                     "t", TimeUtil.format(Math.max(0, left))));
             lore.add(cfg.msg("lore-hint-private"));
-            s.inv.setItem(slots[i], GuiBase.card(e.item(), lore));
+            d[slots[i]] = GuiBase.card(e.item(), lore);
             s.slotToId.add(e.id());
         }
 
         int max = cfg.privateMaxEntries();
         if (s.page == 0) {
-            s.inv.setItem(GuiBase.SLOT_BOOK, GuiBase.icon(cfg.icon("banner", Material.WRITABLE_BOOK),
+            d[GuiBase.SLOT_BOOK] = GuiBase.icon(cfg.icon("banner", Material.WRITABLE_BOOK),
                     "<green><bold>回收箱说明</bold></green>",
                     "<gray>共 <white>" + entries.size() + "</white> 条",
                     max <= 0 ? "<gray>容量上限：<white>无限</white> · 页数无限"
                             : "<gray>容量上限：<white>" + max + " 件</white> · " + GuiBase.pageCount(max) + " 页",
-                    "<dark_gray>左键取回 · 右键转公共 · Shift右键销毁</dark_gray>"));
+                    "<dark_gray>左键取回 · 右键转公共 · Shift右键销毁</dark_gray>");
 
             boolean on = plugin.privateStore().isCollectEnabled(s.target);
-            s.inv.setItem(GuiBase.SLOT_TOGGLE, GuiBase.icon(
+            d[GuiBase.SLOT_TOGGLE] = GuiBase.icon(
                     cfg.icon(on ? "toggle-on" : "toggle-off", on ? Material.LIME_CONCRETE : Material.RED_CONCRETE),
                     on ? "<green><bold>回收：开</bold></green>" : "<red><bold>回收：关</bold></red>",
                     "<gray>丢弃/死亡掉落 " + (on ? "进入你的私人回收站" : "原版落地，扫到进公共箱"),
-                    "<dark_gray>点击切换</dark_gray>"));
+                    "<dark_gray>点击切换</dark_gray>");
 
             NotifyMode notify = plugin.privateStore().notifyMode(s.target);
             boolean valuedOff = cfg.valuableItems().isEmpty();
-            s.inv.setItem(GuiBase.SLOT_NOTIFY, GuiBase.icon(
+            d[GuiBase.SLOT_NOTIFY] = GuiBase.icon(
                     cfg.icon(switch (notify) {
                         case OFF -> "toggle-off";
                         case VALUABLE -> "notify-valuable";
@@ -140,14 +150,14 @@ public final class PrivateGui {
                         case VALUABLE -> valuedOff ? "静默处理（贵重清单已关闭或为空）" : "只提醒贵重物品";
                         case ALL -> "全部提醒";
                     },
-                    "<dark_gray>点击切换</dark_gray>"));
+                    "<dark_gray>点击切换</dark_gray>");
 
             boolean destroy = plugin.privateStore().isExpiryDestroy(s.target);
-            s.inv.setItem(GuiBase.SLOT_EXPIRY, GuiBase.icon(
+            d[GuiBase.SLOT_EXPIRY] = GuiBase.icon(
                     cfg.icon(destroy ? "expiry-destroy" : "expiry-to-public", destroy ? Material.FIRE_CHARGE : Material.CHEST),
                     destroy ? "<red><bold>到期去向：自动销毁</bold></red>" : "<gold><bold>到期去向：转公共回收站</bold></gold>",
                     "<gray>私人箱到期后 " + (destroy ? "直接销毁" : "转入公共回收站"),
-                    "<dark_gray>点击切换</dark_gray>"));
+                    "<dark_gray>点击切换</dark_gray>");
 
             long windowMs = cfg.expiryPreviewMinutes() * 60_000L;
             List<BinEntry> soon = expiringSoon(entries, now, windowMs);
@@ -170,24 +180,26 @@ public final class PrivateGui {
                     previewLore.add(TextUtil.apply(cfg.msg("preview-hover-more"), "n", String.valueOf(soon.size() - shown)));
                 }
             }
-            s.inv.setItem(GuiBase.SLOT_PREVIEW, GuiBase.icon(cfg.icon("preview", Material.SPYGLASS),
-                    cfg.msg("preview-name"), previewLore.toArray(new String[0])));
+            d[GuiBase.SLOT_PREVIEW] = GuiBase.icon(cfg.icon("preview", Material.SPYGLASS),
+                    cfg.msg("preview-name"), previewLore.toArray(new String[0]));
         }
 
-        s.inv.setItem(GuiBase.SLOT_TAKE_ALL, GuiBase.icon(cfg.icon("take-all", Material.LIME_SHULKER_BOX),
+        d[GuiBase.SLOT_TAKE_ALL] = GuiBase.icon(cfg.icon("take-all", Material.LIME_SHULKER_BOX),
                 "<green><bold>全部取回</bold></green>",
-                "<dark_gray>按存入顺序装入背包，装满即停</dark_gray>"));
+                "<dark_gray>最旧优先，装不下的跳过</dark_gray>");
 
-        s.inv.setItem(GuiBase.SLOT_PREV, GuiBase.icon(cfg.icon("prev-page", Material.ARROW), "<white>上一页"));
-        s.inv.setItem(GuiBase.SLOT_NEXT, GuiBase.icon(cfg.icon("next-page", Material.ARROW), "<white>下一页"));
-        s.inv.setItem(GuiBase.SLOT_PAGE, GuiBase.icon(cfg.icon("page-indicator", Material.PAPER),
-                "<white>第 " + (s.page + 1) + "/" + pages + " 页"));
-        s.inv.setItem(GuiBase.SLOT_SWITCH, GuiBase.icon(cfg.icon("switch-to-public", Material.CHEST),
-                "<gold><bold>切到公共回收站</bold></gold>"));
-        s.inv.setItem(GuiBase.SLOT_REFRESH, GuiBase.icon(cfg.icon("refresh", Material.CLOCK), "<white>刷新"));
-        s.inv.setItem(GuiBase.SLOT_SORT, GuiBase.icon(cfg.icon("sort", Material.HOPPER),
+        d[GuiBase.SLOT_PREV] = GuiBase.icon(cfg.icon("prev-page", Material.ARROW), "<white>上一页");
+        d[GuiBase.SLOT_NEXT] = GuiBase.icon(cfg.icon("next-page", Material.ARROW), "<white>下一页");
+        d[GuiBase.SLOT_PAGE] = GuiBase.icon(cfg.icon("page-indicator", Material.PAPER),
+                "<white>第 " + (s.page + 1) + "/" + pages + " 页");
+        d[GuiBase.SLOT_SWITCH] = GuiBase.icon(cfg.icon("switch-to-public", Material.CHEST),
+                "<gold><bold>切到公共回收站</bold></gold>");
+        d[GuiBase.SLOT_REFRESH] = GuiBase.icon(cfg.icon("refresh", Material.CLOCK), "<white>刷新");
+        d[GuiBase.SLOT_SORT] = GuiBase.icon(cfg.icon("sort", Material.HOPPER),
                 "<white>排序：" + GuiBase.sortName(s.sort),
-                "<dark_gray>点击切换</dark_gray>"));
+                "<dark_gray>点击切换</dark_gray>");
+
+        GuiBase.apply(s, d);
     }
 
     static String expiryColor(long left, long ttl) {
@@ -329,15 +341,23 @@ public final class PrivateGui {
             render(s);
             return;
         }
-        if (!GuiBase.canFit(p.getInventory(), e.item())) {
+        ItemStack item = e.item();
+        int fit = GuiBase.maxFit(p.getInventory(), item);
+        if (fit <= 0) {
             plugin.privateStore().putBack(s.target, e);
             TextUtil.msg(p, plugin.settings().prefixed("bag-full"));
             render(s);
             return;
         }
-        p.getInventory().addItem(e.item());
+        int full = item.getAmount();
+        ItemStack taken = fit >= full ? item : GuiBase.split(item, fit);
+        if (fit < full) {
+            plugin.privateStore().putBack(s.target,
+                    new BinEntry(e.id(), item, e.ownerName(), e.depositAt(), e.expireAt(), e.seq()));
+        }
+        p.getInventory().addItem(taken);
         TextUtil.msg(p, TextUtil.apply(plugin.settings().prefixed("taken-back"),
-                "item", ItemNames.describe(e.item())));
+                "item", ItemNames.describe(taken) + " ×" + taken.getAmount()));
         GuiBase.sound(p, plugin, Sound.ENTITY_ITEM_PICKUP);
         render(s);
     }
@@ -375,11 +395,13 @@ public final class PrivateGui {
                     plugin.privateStore().putBack(s.target, gone);
                     TextUtil.msg(s.viewer, cfg.prefixed("entry-expired"));
                 } else {
+                    plugin.getLogger().info("[销毁] 玩家 " + s.viewer.getName() + " 销毁了 "
+                            + ItemNames.describe(gone.item()) + " ×" + gone.item().getAmount());
                     TextUtil.msg(s.viewer, TextUtil.apply(cfg.prefixed("destroyed"),
                             "item", ItemNames.describe(gone.item())));
+                    GuiBase.sound(s.viewer, plugin, Sound.ENTITY_ITEM_BREAK);
                 }
             }
-            GuiBase.sound(s.viewer, plugin, Sound.ENTITY_ITEM_BREAK);
         } else {
             PENDING_DESTROY.put(s.viewer.getUniqueId(),
                     new Pending(id, now + cfg.destroyConfirmSeconds() * 1000L));
@@ -436,10 +458,11 @@ public final class PrivateGui {
         List<BinEntry> all = plugin.privateStore().snapshot(s.target);
         long now = System.currentTimeMillis();
         all.removeIf(e -> e.expireAt() <= now);
-        all.sort(Comparator.comparingLong(BinEntry::depositAt).reversed());
+        all.sort(Comparator.comparingLong(BinEntry::depositAt));
+        int n = 0;
         for (BinEntry peek : all) {
             if (!GuiBase.canFit(p.getInventory(), peek.item())) {
-                break;
+                continue;
             }
             BinEntry taken = plugin.privateStore().takeEntry(s.target, peek.id());
             if (taken == null) {
@@ -450,8 +473,15 @@ public final class PrivateGui {
                 continue;
             }
             p.getInventory().addItem(taken.item());
+            n++;
         }
-        GuiBase.sound(p, plugin, Sound.ENTITY_ITEM_PICKUP);
+        if (n > 0) {
+            TextUtil.msg(p, TextUtil.apply(plugin.settings().prefixed("taken-all-private"),
+                    "n", String.valueOf(n)));
+            GuiBase.sound(p, plugin, Sound.ENTITY_ITEM_PICKUP);
+        } else if (!all.isEmpty()) {
+            TextUtil.msg(p, plugin.settings().prefixed("bag-full"));
+        }
         render(s);
     }
 }

@@ -10,6 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
+import org.bukkit.inventory.ItemStack;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -40,13 +41,13 @@ public final class PublicGui {
     static void render(GuiSession s) {
         var plugin = s.plugin;
         var cfg = plugin.settings();
-        s.inv.clear();
+        ItemStack[] d = new ItemStack[54];
         for (int i = 0; i < 54; i++) {
-            s.inv.setItem(i, GuiBase.pane(cfg.frameMaterial()));
+            d[i] = GuiBase.pane(cfg.frameMaterial());
         }
         if (s.page == 0) {
             for (int i : GuiBase.darkBarSlots(GuiSession.View.PUBLIC)) {
-                s.inv.setItem(i, GuiBase.pane(cfg.darkBarMaterial()));
+                d[i] = GuiBase.pane(cfg.darkBarMaterial());
             }
         }
 
@@ -83,34 +84,36 @@ public final class PublicGui {
                     "color", PrivateGui.expiryColor(left, cfg.publicTtlMs()),
                     "t", TimeUtil.format(Math.max(0, left))));
             lore.add(cfg.msg("lore-hint-public"));
-            s.inv.setItem(slots[i], GuiBase.card(e.item(), lore));
+            d[slots[i]] = GuiBase.card(e.item(), lore);
             s.slotToId.add(e.id());
         }
 
         int max = cfg.publicMaxEntries();
         if (s.page == 0) {
-            s.inv.setItem(GuiBase.SLOT_BOOK, GuiBase.icon(cfg.icon("banner", Material.WRITABLE_BOOK),
+            d[GuiBase.SLOT_BOOK] = GuiBase.icon(cfg.icon("banner", Material.WRITABLE_BOOK),
                     "<gold><bold>公共回收站说明</bold></gold>",
                     "<gray>共 <white>" + entries.size() + "</white> 条",
                     max <= 0 ? "<gray>容量上限：<white>无限</white> · 页数无限"
                             : "<gray>容量上限：<white>" + max + " 件</white> · " + GuiBase.pageCount(max) + " 页",
                     "<gray>来源：扫地无主 / 私人箱到期转入",
-                    "<dark_gray>先到先得，过期删除</dark_gray>"));
+                    "<dark_gray>先到先得，过期删除</dark_gray>");
         }
 
-        s.inv.setItem(GuiBase.SLOT_PREV, GuiBase.icon(cfg.icon("prev-page", Material.ARROW), "<white>上一页"));
-        s.inv.setItem(GuiBase.SLOT_NEXT, GuiBase.icon(cfg.icon("next-page", Material.ARROW), "<white>下一页"));
-        s.inv.setItem(GuiBase.SLOT_PAGE, GuiBase.icon(cfg.icon("page-indicator", Material.PAPER),
-                "<white>第 " + (s.page + 1) + "/" + pages + " 页"));
-        s.inv.setItem(GuiBase.SLOT_SWITCH, GuiBase.icon(cfg.icon("switch-to-private", Material.ENDER_CHEST),
-                "<green><bold>切到私人回收站</bold></green>"));
-        s.inv.setItem(GuiBase.SLOT_REFRESH, GuiBase.icon(cfg.icon("refresh", Material.CLOCK), "<white>刷新"));
-        s.inv.setItem(GuiBase.SLOT_SORT, GuiBase.icon(cfg.icon("sort", Material.HOPPER),
+        d[GuiBase.SLOT_PREV] = GuiBase.icon(cfg.icon("prev-page", Material.ARROW), "<white>上一页");
+        d[GuiBase.SLOT_NEXT] = GuiBase.icon(cfg.icon("next-page", Material.ARROW), "<white>下一页");
+        d[GuiBase.SLOT_PAGE] = GuiBase.icon(cfg.icon("page-indicator", Material.PAPER),
+                "<white>第 " + (s.page + 1) + "/" + pages + " 页");
+        d[GuiBase.SLOT_SWITCH] = GuiBase.icon(cfg.icon("switch-to-private", Material.ENDER_CHEST),
+                "<green><bold>切到私人回收站</bold></green>");
+        d[GuiBase.SLOT_REFRESH] = GuiBase.icon(cfg.icon("refresh", Material.CLOCK), "<white>刷新");
+        d[GuiBase.SLOT_SORT] = GuiBase.icon(cfg.icon("sort", Material.HOPPER),
                 "<white>排序：" + GuiBase.sortName(s.sort),
-                "<dark_gray>点击切换</dark_gray>"));
-        s.inv.setItem(GuiBase.SLOT_TAKE_ALL, GuiBase.icon(cfg.icon("take-all", Material.LIME_SHULKER_BOX),
+                "<dark_gray>点击切换</dark_gray>");
+        d[GuiBase.SLOT_TAKE_ALL] = GuiBase.icon(cfg.icon("take-all", Material.LIME_SHULKER_BOX),
                 "<green><bold>全部取回</bold></green>",
-                "<dark_gray>按存入顺序装入背包，装满即停</dark_gray>"));
+                "<dark_gray>最旧优先，装不下的跳过</dark_gray>");
+
+        GuiBase.apply(s, d);
     }
 
 
@@ -189,13 +192,20 @@ public final class PublicGui {
             render(s);
             return;
         }
-        if (!GuiBase.canFit(p.getInventory(), e.item())) {
+        ItemStack item = e.item();
+        int fit = GuiBase.maxFit(p.getInventory(), item);
+        if (fit <= 0) {
             plugin.publicStore().putBack(e);
             TextUtil.msg(p, plugin.settings().prefixed("bag-full"));
             render(s);
             return;
         }
-        p.getInventory().addItem(e.item());
+        int full = item.getAmount();
+        ItemStack taken = fit >= full ? item : GuiBase.split(item, fit);
+        if (fit < full) {
+            plugin.publicStore().putBack(new BinEntry(e.id(), item, e.ownerName(), e.depositAt(), e.expireAt(), e.seq()));
+        }
+        p.getInventory().addItem(taken);
         TextUtil.msg(p, plugin.settings().prefixed("public-taken"));
         GuiBase.sound(p, plugin, Sound.ENTITY_ITEM_PICKUP);
         render(s);
@@ -211,7 +221,7 @@ public final class PublicGui {
         int n = 0;
         for (BinEntry peek : all) {
             if (!GuiBase.canFit(p.getInventory(), peek.item())) {
-                break;
+                continue;
             }
             BinEntry taken = plugin.publicStore().take(peek.id());
             if (taken == null) {
@@ -228,6 +238,8 @@ public final class PublicGui {
             TextUtil.msg(p, TextUtil.apply(plugin.settings().prefixed("taken-all-public"),
                     "n", String.valueOf(n)));
             GuiBase.sound(p, plugin, Sound.ENTITY_ITEM_PICKUP);
+        } else if (!all.isEmpty()) {
+            TextUtil.msg(p, plugin.settings().prefixed("bag-full"));
         }
         render(s);
     }

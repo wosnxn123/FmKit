@@ -63,13 +63,15 @@ public final class BinExpiryTask {
                 }
                 notify(en.getKey(), moved, destroyed, valuable);
                 warn(en.getKey(), bin, now, valuable);
+                plugin.binLogger().privateExpire(en.getKey(), moved, destroyed);
             }
         }
         warnedIds.retainAll(liveIds);
-        int purged = plugin.publicStore().removeExpired(now);
-        if (purged > 0) {
-            plugin.publicStore().saveAsync();
+        List<BinEntry> purged = plugin.publicStore().removeExpired(now);
+        if (!purged.isEmpty()) {
+            plugin.binLogger().publicExpire(purged);
         }
+        plugin.binLogger().flushWindows();
     }
 
     /** Pull expired entries whose destination is the public bin. */

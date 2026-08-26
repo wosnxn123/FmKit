@@ -12,6 +12,9 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The single global public bin. Persisted as plugins/FmKit/bins/public.yml.
@@ -24,6 +27,12 @@ public final class PublicBinStore {
     /** Arrival order: deposit time first, then entity age within one sweep round. */
     private static final Comparator<BinEntry> BY_ARRIVAL =
             Comparator.comparingLong(BinEntry::depositAt).thenComparingLong(BinEntry::seq);
+    /** Ordered single-thread writer: public.yml saves never interleave. */
+    private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "fmkit-public-io");
+        t.setDaemon(true);
+        return t;
+    });
 
     public PublicBinStore(FmKitPlugin plugin) {
         this.plugin = plugin;
@@ -54,9 +63,10 @@ public final class PublicBinStore {
                 }
             }
             entries.sort(BY_ARRIVAL);
-            int purged = removeExpired(System.currentTimeMillis());
-            if (purged > 0) {
-                plugin.getLogger().info("启动清理：移除 " + purged + " 条过期公共条目");
+            List<BinEntry> purged = removeExpired(System.currentTimeMillis());
+            if (!purged.isEmpty()) {
+                plugin.getLogger().info("启动清理：移除 " + purged.size() + " 条过期公共条目");
+                plugin.binLogger().publicExpire(purged);
                 saveSync();
             }
         } catch (Exception ex) {
@@ -73,8 +83,13 @@ public final class PublicBinStore {
             entries.sort(BY_ARRIVAL);
             int max = plugin.settings().publicMaxEntries();
             if (max > 0 && entries.size() > max) {
-                entries.remove(0);
+                BinEntry dropped = entries.remove(0);
+                plugin.binLogger().publicOverflow(dropped, max);
             }
+        }
+        int capMax = plugin.settings().publicMaxEntries();
+        if (capMax <= 0 || entries.size() < capMax) {
+            plugin.binLogger().publicBelowCap();
         }
         saveAsync();
     }
@@ -109,15 +124,16 @@ public final class PublicBinStore {
         return entries.isEmpty() ? -1 : entries.get(0).depositAt();
     }
 
-    public synchronized int removeExpired(long now) {
-        int removed = 0;
+    public synchronized List<BinEntry> removeExpired(long now) {
+        List<BinEntry> removed = new ArrayList<>();
         for (Iterator<BinEntry> it = entries.iterator(); it.hasNext(); ) {
-            if (it.next().expireAt() <= now) {
+            BinEntry e = it.next();
+            if (e.expireAt() <= now) {
                 it.remove();
-                removed++;
+                removed.add(e);
             }
         }
-        if (removed > 0) {
+        if (!removed.isEmpty()) {
             saveAsync();
         }
         return removed;
@@ -147,7 +163,7 @@ public final class PublicBinStore {
     public synchronized void saveAsync() {
         YamlConfiguration y = toYaml();
         File f = file();
-        Bukkit.getAsyncScheduler().runNow(plugin, t -> {
+        io.execute(() -> {
             try {
                 y.save(f);
             } catch (IOException ex) {
@@ -161,6 +177,18 @@ public final class PublicBinStore {
             toYaml().save(file());
         } catch (IOException ex) {
             plugin.getLogger().warning("保存失败 public: " + ex.getMessage());
+        }
+    }
+
+    /** Drain the writer before the final synchronous save in onDisable. */
+    public void shutdown() {
+        io.shutdown();
+        try {
+            if (!io.awaitTermination(10, TimeUnit.SECONDS)) {
+                plugin.getLogger().warning("公共箱写入器未在 10 秒内排空");
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
         }
     }
 }

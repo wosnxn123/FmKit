@@ -366,11 +366,16 @@ bins:
   expiry-preview-minutes: 10 # 到期预览按钮的时间窗（分钟）
   expiry-destroy: false      # 到期去向初始值：到期后自动销毁（私人箱槽5 按玩家可切换）
   destroy-confirm-seconds: 3 # 销毁两步确认窗口（秒）
+  log:                         # 控制台箱日志（仅后台输出，不打扰玩家）
+    overflow: episode          # off|episode|window|each  容量溢出（私人转公共/公共淘汰）；episode=每次溢出期只记一行
+    public-expire: off         # off|window|each          公共箱到期清理；window=每 60 秒聚合成一行
+    private-expire: off        # off|each                 私人箱到期流转/销毁
+    sweep-deposit: off         # off|each                 扫地入库汇总（每轮一行）
 
 # GUI
 gui:
   sounds: true
-  auto-refresh-seconds: 2    # GUI 打开期间自动重绘周期（秒），倒计时/悬停预览保持新鲜；0=关闭
+  auto-refresh-seconds: 1    # GUI 打开期间自动重绘周期（秒），倒计时/悬停预览保持新鲜；0=关闭
   frame-material: GRAY_STAINED_GLASS_PANE
   dark-bar-material: BLACK_STAINED_GLASS_PANE
   icons:
@@ -426,6 +431,7 @@ messages:
   public-taken: "<green>已从公共回收站取走物品</green>"
   taken-back: "<green>已取回：</green><white>{item}</white>"
   taken-all-public: "<green>已从公共回收站取走 <aqua>{n}</aqua> 件物品</green>"
+  taken-all-private: "<green>已按存入顺序取回 <aqua>{n}</aqua> 件物品</green>"
   reload-done: "配置已重载"
   sweep-on: "扫地已开启"
   sweep-off: "扫地已暂停"
@@ -446,6 +452,7 @@ messages:
   player-not-found: "找不到玩家：{player}"
   hub-title: "<aqua><bold>回收站</bold></aqua>"
   private-title: "<green><bold>你的回收箱</bold></green> <gray>·</gray> <white>{n}</white> 件"
+  private-title-viewing: "<green><bold>{player} 的回收箱</bold></green> <gray>·</gray> <white>{n}</white> 件 <dark_gray>（管理员查看）</dark_gray>"
   public-title: "<gold><bold>公共回收箱</bold></gold> <gray>·</gray> <white>{n}</white> 件"
   lore-drop-time: "<gray>丢弃时间：{time}</gray>"
   lore-expiry: "{color}{t} 后转入公共"
