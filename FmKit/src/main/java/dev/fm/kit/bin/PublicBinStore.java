@@ -24,9 +24,11 @@ public final class PublicBinStore {
 
     private final FmKitPlugin plugin;
     private final List<BinEntry> entries = new ArrayList<>();
-    /** Arrival order: deposit time first, then entity age within one sweep round. */
+    /** Arrival order: deposit time, then entity age within one sweep round, then stable id
+     *  (private-origin entries carry seq 0, so the id keeps storage order deterministic). */
     private static final Comparator<BinEntry> BY_ARRIVAL =
-            Comparator.comparingLong(BinEntry::depositAt).thenComparingLong(BinEntry::seq);
+            Comparator.comparingLong(BinEntry::depositAt).thenComparingLong(BinEntry::seq)
+                    .thenComparing(BinEntry::id);
     /** Ordered single-thread writer: public.yml saves never interleave. */
     private final ExecutorService io = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "fmkit-public-io");

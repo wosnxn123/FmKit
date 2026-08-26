@@ -80,10 +80,15 @@ public final class PrivateGui {
         List<BinEntry> entries = plugin.privateStore().snapshot(s.target);
         long now = System.currentTimeMillis();
         entries.removeIf(e -> e.expireAt() <= now);
+        // Equal timestamps are common within one sweep round; the id tiebreak keeps
+        // positions stable even when takeEntry/putBack moves an entry in the list.
         switch (s.sort) {
-            case NEWEST -> entries.sort(Comparator.comparingLong(BinEntry::depositAt).reversed());
-            case OLDEST -> entries.sort(Comparator.comparingLong(BinEntry::depositAt));
-            case EXPIRING -> entries.sort(Comparator.comparingLong(BinEntry::expireAt));
+            case NEWEST -> entries.sort(Comparator.comparingLong(BinEntry::depositAt).reversed()
+                    .thenComparing(BinEntry::id));
+            case OLDEST -> entries.sort(Comparator.comparingLong(BinEntry::depositAt)
+                    .thenComparing(BinEntry::id));
+            case EXPIRING -> entries.sort(Comparator.comparingLong(BinEntry::expireAt)
+                    .thenComparing(BinEntry::id));
         }
         int pages = GuiBase.pageCount(entries.size());
         s.page = Math.max(0, Math.min(s.page, pages - 1));
@@ -417,7 +422,7 @@ public final class PrivateGui {
             long left = e.expireAt() - now;
             return left <= 0 || left > windowMs;
         });
-        out.sort(Comparator.comparingLong(BinEntry::expireAt));
+        out.sort(Comparator.comparingLong(BinEntry::expireAt).thenComparing(BinEntry::id));
         return out;
     }
 
@@ -458,7 +463,7 @@ public final class PrivateGui {
         List<BinEntry> all = plugin.privateStore().snapshot(s.target);
         long now = System.currentTimeMillis();
         all.removeIf(e -> e.expireAt() <= now);
-        all.sort(Comparator.comparingLong(BinEntry::depositAt));
+        all.sort(Comparator.comparingLong(BinEntry::depositAt).thenComparing(BinEntry::id));
         int n = 0;
         for (BinEntry peek : all) {
             if (!GuiBase.canFit(p.getInventory(), peek.item())) {

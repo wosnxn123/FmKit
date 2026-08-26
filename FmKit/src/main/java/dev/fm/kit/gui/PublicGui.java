@@ -55,9 +55,12 @@ public final class PublicGui {
         long now = System.currentTimeMillis();
         entries.removeIf(e -> e.expireAt() <= now);
         switch (s.sort) {
-            case NEWEST -> entries.sort(Comparator.comparingLong(BinEntry::depositAt).reversed());
-            case OLDEST -> entries.sort(Comparator.comparingLong(BinEntry::depositAt));
-            case EXPIRING -> entries.sort(Comparator.comparingLong(BinEntry::expireAt));
+            case NEWEST -> entries.sort(Comparator.comparingLong(BinEntry::depositAt).reversed()
+                    .thenComparing(BinEntry::id));
+            case OLDEST -> entries.sort(Comparator.comparingLong(BinEntry::depositAt)
+                    .thenComparing(BinEntry::id));
+            case EXPIRING -> entries.sort(Comparator.comparingLong(BinEntry::expireAt)
+                    .thenComparing(BinEntry::id));
         }
         int pages = GuiBase.pageCount(entries.size());
         s.page = Math.max(0, Math.min(s.page, pages - 1));
@@ -217,7 +220,7 @@ public final class PublicGui {
         List<BinEntry> all = plugin.publicStore().snapshot();
         long now = System.currentTimeMillis();
         all.removeIf(e -> e.expireAt() <= now);
-        all.sort(Comparator.comparingLong(BinEntry::depositAt));
+        all.sort(Comparator.comparingLong(BinEntry::depositAt).thenComparing(BinEntry::id));
         int n = 0;
         for (BinEntry peek : all) {
             if (!GuiBase.canFit(p.getInventory(), peek.item())) {
