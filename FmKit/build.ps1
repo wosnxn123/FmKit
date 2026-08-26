@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
-$root = "D:\1\MC\Fm\FmKit"
-$m2 = "C:\Users\Snowflake\.m2\repository"
+$root = $PSScriptRoot
+$m2 = if ($env:M2_REPO) { $env:M2_REPO } else { Join-Path $env:USERPROFILE ".m2\repository" }
+if (-not (Test-Path $m2)) { throw "Maven repository not found: $m2 (set M2_REPO to override)" }
 $cp = ((Get-ChildItem $m2 -Recurse -Filter *.jar | Where-Object { $_.Name -notmatch 'sources|javadoc' }).FullName) -join ';'
 $srcs = (Get-ChildItem "$root\src\main\java" -Recurse -Filter *.java).FullName
 & javac --release 21 -encoding UTF-8 -cp $cp -d "$root\target\classes" $srcs
