@@ -1,6 +1,7 @@
 package dev.fm.kit.util;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -10,12 +11,27 @@ import org.bukkit.entity.Player;
 public final class TextUtil {
 
     private static final MiniMessage MM = MiniMessage.miniMessage();
+    /**
+     * Section-sign form with the {@code §x§r§r§g§g§b§b} hex encoding that
+     * CraftChatMessage understands; needed by the String-only
+     * InventoryView#setTitle.
+     */
+    private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.builder()
+            .character(LegacyComponentSerializer.SECTION_CHAR)
+            .hexCharacter(LegacyComponentSerializer.HEX_CHAR)
+            .useUnusualXRepeatedCharacterHexFormat()
+            .build();
 
     private TextUtil() {
     }
 
     public static Component mini(String s) {
         return MM.deserialize(s == null ? "" : s);
+    }
+
+    /** MiniMessage source -> legacy section string. */
+    public static String legacy(String s) {
+        return LEGACY.serialize(mini(s));
     }
 
     /** apply(tpl, "n", "3", "s", "60") replaces {n}/{s}. */

@@ -7,6 +7,7 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -110,6 +111,37 @@ public final class GuiBase {
                 case PUBLIC -> PublicGui.render(s);
             }
         }, null, period, period);
+    }
+
+    /**
+     * Refreshes the live window's title when its text changed. The bin count is
+     * baked into the title, so every render has to re-check it; the string
+     * compare keeps unchanged frames from re-sending the open packet on each
+     * auto-refresh tick.
+     *
+     * InventoryView#setTitle re-sends the open packet for the *same* container
+     * id, so the client keeps the GUI open and a carried cursor stack is never
+     * close-flushed. Recreating the inventory and calling openInventory() would
+     * allocate a new window id, and the implicit close flushes the carried stack
+     * while a click's own cursor write is still pending -- that duplicates a
+     * dragged stack.
+     */
+    public static void retitle(GuiSession s, String want) {
+        if (want.equals(s.titleText)) {
+            return;
+        }
+        if (!s.viewer.isOnline()) {
+            return;
+        }
+        InventoryView view = s.viewer.getOpenInventory();
+        if (view.getTopInventory() != s.inv) {
+            // Not our window yet (open() renders before openInventory) or no longer
+            // ours. Leave titleText on the value the client actually holds, so the
+            // next render still sends the update instead of assuming it landed.
+            return;
+        }
+        view.setTitle(TextUtil.legacy(want));
+        s.titleText = want;
     }
 
     private GuiBase() {

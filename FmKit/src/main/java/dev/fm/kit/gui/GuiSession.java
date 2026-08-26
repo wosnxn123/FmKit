@@ -23,8 +23,16 @@ public final class GuiSession implements InventoryHolder {
     /** PRIVATE view: bin owner (may differ from viewer for admin browsing). */
     public UUID target;
     public int page;
+    /** Page count of the last render; bounds NEXT clicks. */
+    public int pages = 1;
     public Sort sort = Sort.NEWEST;
     public Inventory inv;
+    /**
+     * MiniMessage source of the title last sent to the client. The count in the
+     * title is dynamic, so render() compares against this and retitles in place
+     * only when the text actually changed.
+     */
+    public String titleText = "";
     /** Rendered entry ids, parallel to the content slots actually filled. */
     public final List<String> slotToId = new ArrayList<>();
     /** Running auto-refresh task for this session; self-cancels once the window is gone. */

@@ -7,7 +7,6 @@ import dev.fm.kit.bin.NotifyMode;
 import dev.fm.kit.util.ItemNames;
 import dev.fm.kit.util.TextUtil;
 import dev.fm.kit.util.TimeUtil;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -44,39 +43,32 @@ public final class PrivateGui {
         GuiSession s = new GuiSession(plugin, viewer, GuiSession.View.PRIVATE);
         s.target = target;
         s.sort = GuiSession.Sort.EXPIRING;
-        s.inv = Bukkit.createInventory(s, 54, title(plugin, viewer, target));
+        s.titleText = title(plugin, viewer, target);
+        s.inv = Bukkit.createInventory(s, 54, TextUtil.mini(s.titleText));
         render(s);
         viewer.openInventory(s.inv);
         GuiBase.startAutoRefresh(s);
     }
 
-    private static Component title(FmKitPlugin plugin, Player viewer, UUID target) {
+    /** MiniMessage source; the {n} count is re-evaluated on every render. */
+    private static String title(FmKitPlugin plugin, Player viewer, UUID target) {
         int n = plugin.privateStore().size(target);
         if (viewer.getUniqueId().equals(target)) {
-            return TextUtil.mini(TextUtil.apply(plugin.settings().msg("private-title"),
-                    "n", String.valueOf(n)));
+            return TextUtil.apply(plugin.settings().msg("private-title"),
+                    "n", String.valueOf(n));
         }
         String name = plugin.privateStore().knownName(target);
         if (name == null) {
             name = target.toString().substring(0, 8);
         }
-        return TextUtil.mini(TextUtil.apply(plugin.settings().msg("private-title-viewing"),
-                "player", name, "n", String.valueOf(n)));
+        return TextUtil.apply(plugin.settings().msg("private-title-viewing"),
+                "player", name, "n", String.valueOf(n));
     }
 
     static void render(GuiSession s) {
         var plugin = s.plugin;
         var cfg = plugin.settings();
-        ItemStack[] d = new ItemStack[54];
-        for (int i = 0; i < 54; i++) {
-            d[i] = GuiBase.pane(cfg.frameMaterial());
-        }
-        if (s.page == 0) {
-            for (int i : GuiBase.darkBarSlots(GuiSession.View.PRIVATE)) {
-                d[i] = GuiBase.pane(cfg.darkBarMaterial());
-            }
-        }
-
+        GuiBase.retitle(s, title(plugin, s.viewer, s.target));
         List<BinEntry> entries = plugin.privateStore().snapshot(s.target);
         long now = System.currentTimeMillis();
         entries.removeIf(e -> e.expireAt() <= now);
@@ -90,8 +82,26 @@ public final class PrivateGui {
             case EXPIRING -> entries.sort(Comparator.comparingLong(BinEntry::expireAt)
                     .thenComparing(BinEntry::id));
         }
+        // Clamp before any page-0 chrome so an out-of-range page (NEXT past the last
+        // page) never renders page-0 content without its dark bar.
         int pages = GuiBase.pageCount(entries.size());
+        s.pages = pages;
         s.page = Math.max(0, Math.min(s.page, pages - 1));
+
+        ItemStack[] d = new ItemStack[54];
+        for (int i = 0; i < 54; i++) {
+            d[i] = GuiBase.pane(cfg.frameMaterial());
+        }
+        if (s.page == 0) {
+            for (int i : GuiBase.darkBarSlots(GuiSession.View.PRIVATE)) {
+                d[i] = GuiBase.pane(cfg.darkBarMaterial());
+            }
+        }
+        // Bottom toolbar row exists on every page; same dark colour as the top bar
+        // so the chrome reads as one frame.
+        for (int i = 45; i <= 53; i++) {
+            d[i] = GuiBase.pane(cfg.darkBarMaterial());
+        }
         int[] slots = GuiBase.pageSlots(s.page);
         int start = GuiBase.pageStart(s.page);
 
@@ -235,9 +245,11 @@ public final class PrivateGui {
             return;
         }
         if (slot == GuiBase.SLOT_NEXT) {
-            s.page++;
-            render(s);
-            GuiBase.sound(p, plugin, Sound.UI_BUTTON_CLICK);
+            if (s.page < s.pages - 1) {
+                s.page++;
+                render(s);
+                GuiBase.sound(p, plugin, Sound.UI_BUTTON_CLICK);
+            }
             return;
         }
         if (slot == GuiBase.SLOT_REFRESH) {
