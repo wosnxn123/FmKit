@@ -146,11 +146,21 @@ async function scenario() {
   })
   await new Promise(res => bot.once('spawn', res))
   console.log('bot spawned:', bot.username)
+  const chat = []
+  bot.on('message', m => chat.push(m.toString()))
 
   // shield the bot: a creeper once killed it mid-run, closing the GUI and
   // dropping the cursor stack (sweep then ate it) — pure environment noise.
   await rcon(`effect give ${BOT_NAME} minecraft:resistance 600 4 true`)
   await rcon(`effect give ${BOT_NAME} minecraft:fire_resistance 600 0 true`)
+
+  // fresh-profile baseline: earlier runs (and yunbei_hotkey_test's `giveslots 36`)
+  // accumulate bonus slots on the cached profile, and the layout / locked-slot cases
+  // below assume the default 27 unlocked. Reclaim whatever bonus is on the profile.
+  await rcon(`fmyunbeiadmin clear ${BOT_NAME} confirm`)
+  await rcon(`fmyunbeiadmin settier ${BOT_NAME} 0`)
+  const bonus0 = Number(((await statusCounts()).raw.match(/加成\s*(\d+)/) || [, 0])[1])
+  if (bonus0 > 0) await rcon(`fmyunbeiadmin giveslots ${BOT_NAME} -${bonus0}`)
 
   // clean slate + give 64 stone
   await rcon(`clear ${BOT_NAME}`)
@@ -177,7 +187,8 @@ async function scenario() {
 
   // layout: page-0 top bar = panes 0,1,3,5,7,8 + xp_bottle@2 sunflower@4 book@6;
   // unlocked=27 -> locals 9..35 air, single preview local 36 light-blue, rest gray;
-  // toolbar 45..53 = arrow, pane, paper, nether_star, clock, pane, shulker, hopper, arrow
+  // toolbar 45..53 = arrow(prev), comparator(sort), paper(page), nether_star(tier),
+  //                  clock(refresh), pane, hopper(takeAll), lime_shulker_box(depositAll), arrow(next)
   console.log('  slots0-8:', win.slots.slice(0, 9).map(s => s ? s.name : 'null').join(','))
   console.log('  slots9-44:', win.slots.slice(9, 45).map(s => s ? s.name : 'null').join(','))
   const topBarOk = [0, 1, 3, 5, 7, 8].every(i => win.slots[i] && win.slots[i].name === 'black_stained_glass_pane')
@@ -188,14 +199,16 @@ async function scenario() {
   const lockedOk = win.slots[36] && win.slots[36].name === 'light_blue_stained_glass_pane'
     && win.slots.slice(37, 45).every(s => s && s.name === 'gray_stained_glass_pane')
   const toolbarItems = win.slots[45] && win.slots[45].name === 'arrow'
+    && win.slots[46] && win.slots[46].name === 'comparator'
     && win.slots[47] && win.slots[47].name === 'paper'
     && win.slots[48] && win.slots[48].name === 'nether_star'
     && win.slots[49] && win.slots[49].name === 'clock'
-    && win.slots[51] && win.slots[51].name === 'lime_shulker_box'
-    && win.slots[52] && win.slots[52].name === 'hopper'
+    && win.slots[50] && win.slots[50].name === 'black_stained_glass_pane'
+    && win.slots[51] && win.slots[51].name === 'hopper'
+    && win.slots[52] && win.slots[52].name === 'lime_shulker_box'
     && win.slots[53] && win.slots[53].name === 'arrow'
-    && [46, 50].every(i => win.slots[i] && win.slots[i].name === 'black_stained_glass_pane')
-  record('layout top bar + unlocked/locked panes', topBarOk && unlockedOk && lockedOk, `top=${topBarOk} unlocked=${unlockedOk} locked=${lockedOk}`)
+  record('layout top bar + unlocked/locked panes', topBarOk && unlockedOk && lockedOk,
+    `top=${topBarOk} unlocked=${unlockedOk} locked=${lockedOk}`)
   record('toolbar icons', toolbarItems, win.slots.slice(45, 54).map(s => s ? s.name : '-').join(','))
 
   // ---- store stone via cursor click on slot 0 ----
@@ -265,11 +278,96 @@ async function scenario() {
   record('client slot resynced after partial take',
     !!left && left.name === 'stone' && left.count === 64 && leftName.includes('×64'),
     left ? `${left.name}x${left.count} name="${leftName}"` : 'slot empty (stale prediction won)')
-  await click(bot, 52)                  // takeAll reset
+  await click(bot, 51)                  // takeAll reset
   await waitFor(async () => (await statusCounts()).items === 0, 8000)
   await rcon(`clear ${BOT_NAME}`)
   await rcon(`give ${BOT_NAME} minecraft:stone 64`)
   await sleep(500)
+
+  // ---- cursor + occupied slot, non-mergeable: vanilla-style exchange ----
+  // <= one vanilla unit in the slot -> true swap (slot stack to the cursor, cursor
+  // stack into the slot). Above one unit the cursor cannot carry the slot out, so
+  // the click is refused (swap-too-big) rather than stranding a remainder.
+  const cursorNamed = (name) => {
+    const c = bot.inventory.slots[45]
+    if (c && c.name === name) return c
+    const w = bot.currentWindow
+    if (w && w.selectedItem && w.selectedItem.name === name) return w.selectedItem
+    return null
+  }
+  /** Cloud empty, tier 0, bag empty, GUI closed — both swap cases start here. */
+  const resetSides = async () => {
+    closeGui(bot)
+    await sleep(600)
+    await rcon(`fmyunbeiadmin clear ${BOT_NAME} confirm`)
+    await rcon(`fmyunbeiadmin settier ${BOT_NAME} 0`)
+    await rcon(`clear ${BOT_NAME}`)
+    await sleep(400)
+  }
+  /** n of item straight into cloud slot 0 via the admin path, then reopen the GUI. */
+  const seedCloud = async (item, n) => {
+    await rcon(`fmyunbeiadmin give ${BOT_NAME} ${item} ${n}`)
+    await sleep(400)
+    win = await openGui(bot, '/fmyunbei')
+    await sleep(700)
+    const s = await statusCounts()
+    return { ok: s.used === 1 && s.items === n, detail: `used=${s.used} items=${s.items}` }
+  }
+  /** One vanilla stack of stone onto the cursor. */
+  const cursorStone = async () => {
+    await rcon(`give ${BOT_NAME} minecraft:stone 64`)
+    await sleep(500)
+    win = bot.currentWindow || win
+    src = win.slots.findIndex((s, i) => i >= (win.inventoryStart || 54) && s && s.name === 'stone')
+    if (src >= 0) await click(bot, src)
+    await sleep(400)
+  }
+
+  // case 7: slot holds exactly one unit -> swap
+  await resetSides()
+  const seed64 = await seedCloud('dirt', 64)
+  await cursorStone()
+  await click(bot, 9)
+  await waitFor(() => cursorNamed('dirt'), 6000)
+  await sleep(1000)
+  win = bot.currentWindow || win
+  st = await statusCounts()
+  const onCursor = cursorNamed('dirt')
+  const inSlot = win.slots[9]
+  record('cursor swap: seeded one unit in cloud', seed64.ok, seed64.detail)
+  record('cursor swap: slot stack lands on cursor',
+    !!onCursor && onCursor.count === 64, onCursor ? `${onCursor.name}x${onCursor.count}` : 'empty')
+  record('cursor swap: cursor stack takes the slot',
+    !!inSlot && inSlot.name === 'stone' && inSlot.count === 64 && st.used === 1 && st.items === 64,
+    `slot=${inSlot ? inSlot.name + 'x' + inSlot.count : 'empty'} used=${st.used} items=${st.items}`)
+
+  // case 8: slot holds two units -> refuse, both sides untouched
+  await resetSides()
+  const seed128 = await seedCloud('dirt', 128)
+  await cursorStone()
+  chat.length = 0
+  await click(bot, 9)
+  await sleep(1000)
+  win = bot.currentWindow || win
+  st = await statusCounts()
+  const kept = cursorNamed('stone')
+  const stillDirt = win.slots[9]
+  const tooBig = chat.find(t => t.includes('无法与手中物品交换'))
+  record('cursor swap denied: seeded two units in cloud', seed128.ok, seed128.detail)
+  const dirtName = stillDirt ? textOfItem(stillDirt) : ''
+  record('cursor swap denied: cloud untouched',
+    st.used === 1 && st.items === 128 && !!stillDirt && stillDirt.name === 'dirt'
+    && stillDirt.count === 64 && dirtName.includes('×128'),
+    `slot=${stillDirt ? stillDirt.name + 'x' + stillDirt.count : 'empty'} name="${dirtName}" used=${st.used} items=${st.items}`)
+  record('cursor swap denied: cursor keeps its stack',
+    !!kept && kept.count === 64, kept ? `${kept.name}x${kept.count}` : 'empty')
+  record('cursor swap denied: swap-too-big message', !!tooBig, tooBig || '(none)')
+
+  await resetSides()
+  await rcon(`give ${BOT_NAME} minecraft:stone 64`)
+  await sleep(500)
+  win = await openGui(bot, '/fmyunbei')
+  await sleep(600)
 
   // ---- locked slot deny ----
   await click(bot, 40) // locked slot (global 31)
@@ -277,13 +375,13 @@ async function scenario() {
   st = await statusCounts()
   record('locked slot denied', st.used === 0 && st.items === 0, `used=${st.used} items=${st.items}`)
 
-  // ---- depositAll (slot 51) then takeAll (slot 52) ----
+  // ---- depositAll (slot 52, shulker) then takeAll (slot 51, hopper) ----
   const preDeposit = bot.inventory.items().map(i => `${i.name}x${i.count}`).join(',')
-  await click(bot, 51)
+  await click(bot, 52)
   st = await waitFor(async () => (await statusCounts()).items === 64, 8000).then(async ok => ok ? statusCounts() : statusCounts())
   record('depositAll via toolbar', st.used === 1 && st.items === 64,
     `used=${st.used} items=${st.items}; inv=${invCount(bot, 'stone')}; pre=[${preDeposit}]`)
-  await click(bot, 52)
+  await click(bot, 51)
   const tookBack = await waitFor(async () => invCount(bot, 'stone') === 64, 8000)
   st = await statusCounts()
   record('takeAll via toolbar', tookBack && st.used === 0 && st.items === 0, `inv=${invCount(bot, 'stone')} used=${st.used} items=${st.items}`)
@@ -328,7 +426,7 @@ async function scenario() {
   win = bot.currentWindow || win
   const dragCounts = [9, 10, 11, 12].map(i => win.slots[i] ? win.slots[i].count : 0)
   record('drag splits 16 per slot', st.used === 4 && dragCounts.every(c => c === 16), dragCounts.join(','))
-  await click(bot, 52)                           // takeAll reset
+  await click(bot, 51)                           // takeAll reset
   await waitFor(async () => invCount(bot, 'stone') === 64, 8000)
 
   closeGui(bot)
