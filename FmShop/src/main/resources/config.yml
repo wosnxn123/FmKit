@@ -1,0 +1,104 @@
+# ===========================================================================
+#  FmShop - 服务器商店与经济
+#  金额单位为“金币”，内部按分（1 金币 = 100 分）整数存储，永不出现浮点误差。
+#  商品价格表在 prices.yml。
+# ===========================================================================
+
+currency:
+  # 货币显示名
+  name: "金币"
+  # 新玩家首次进服的初始余额
+  starting-balance: 100.0
+
+fees:
+  # 出售手续费：从卖出所得中扣除（500 = 5%）
+  sell-bp: 500
+  # 购买附加费：在买入价之上加收（0 = 不加收）
+  buy-bp: 0
+  # 转账手续费（200 = 2%）
+  pay-bp: 200
+  # 手续费去向：void = 直接销毁（推荐，抑制通胀）；tax-pool = 存入公共税池
+  destination: void
+
+limits:
+  # 单次买/卖操作最多处理的物品数量（2304 = 36 格 × 64）
+  max-per-action: 2304
+  # /fmshop pay 的最小转账额
+  min-pay: 1.0
+  # 每日限购/限售的重置时刻（本地时间 0-23）
+  reset-hour: 4
+
+gui:
+  # 界面价格自动刷新间隔（秒），0 = 关闭
+  auto-refresh-seconds: 5
+  # 是否播放交易音效
+  sounds: true
+  icons:
+    filler: GRAY_STAINED_GLASS_PANE
+    buy: EMERALD
+    sell: GOLD_INGOT
+    bag: CHEST
+    balance: PLAYER_HEAD
+    back: ARROW
+    prev: ARROW
+    next: ARROW
+    close: BARRIER
+    confirm: LIME_DYE
+    cancel: RED_DYE
+
+audit:
+  # 记录所有交易到 plugins/FmShop/audit/YYYY-MM-DD.log
+  enabled: true
+  # 日志保留天数，超期自动清理
+  keep-days: 14
+  # 单笔金额达到该值时提醒在线管理员
+  alert-above: 10000.0
+
+doctor:
+  # true = 价格表存在套利风险的商品直接拒绝加载；false = 仅在 /fsa doctor 中警告
+  strict: false
+
+# ---------------------------------------------------------------------------
+#  消息，支持 MiniMessage 标签；{xxx} 为占位符
+# ---------------------------------------------------------------------------
+messages:
+  prefix: "<gray>[<gold>商店</gold>]</gray> "
+  no-permission: "<red>你没有权限</red>"
+  players-only: "<red>该指令只能由玩家使用</red>"
+  balance: "<green>余额：<white>{amount}</white></green>"
+  balance-other: "<green><white>{player}</white> 的余额：<white>{amount}</white></green>"
+  unknown-item: "<red>未找到该商品：<white>{input}</white></red>"
+  not-buyable: "<red>{item} 不出售</red>"
+  not-sellable: "<red>{item} 不回收</red>"
+  price-line: "<gray>{item}</gray> <dark_gray>|</dark_gray> <green>买入 <white>{buy}</white></green> <dark_gray>|</dark_gray> <gold>卖出 <white>{sell}</white></gold>"
+  price-dynamic: "<gray>行情 <white>{percent}%</white>（{trend}）</gray>"
+  buy-ok: "<green>购买 {item} ×<white>{n}</white>，支付 <white>{cost}</white></green>"
+  sell-ok: "<gold>出售 {item} ×<white>{n}</white>，获得 <white>{gain}</white></gold>"
+  sell-fee: "<gray>（手续费 <white>{fee}</white>）</gray>"
+  no-money: "<red>余额不足，还需 <white>{need}</white></red>"
+  no-space: "<red>背包空间不足</red>"
+  nothing-to-sell: "<red>背包里没有可回收的物品</red>"
+  no-sell-creative: "<red>创造模式无法出售物品</red>"
+  sell-all-ok: "<gold>回收 <white>{kinds}</white> 种共 <white>{n}</white> 件，获得 <white>{gain}</white></gold>"
+  hand-empty: "<red>手上没有物品</red>"
+  quota-buy: "<red>{item} 今日限购 <white>{limit}</white>，剩余 <white>{left}</white>（<white>{reset}</white> 后重置）</red>"
+  quota-sell: "<red>{item} 今日限售 <white>{limit}</white>，剩余 <white>{left}</white>（<white>{reset}</white> 后重置）</red>"
+  pay-ok: "<green>已向 <white>{player}</white> 转账 <white>{amount}</white></green>"
+  pay-recv: "<green>收到 <white>{player}</white> 的转账 <white>{amount}</white></green>"
+  pay-self: "<red>不能给自己转账</red>"
+  pay-too-small: "<red>最少转账 <white>{min}</white></red>"
+  pay-failed: "<red>转账失败：余额不足或对方账户已满</red>"
+  player-not-found: "<red>找不到玩家 <white>{player}</white></red>"
+  bad-amount: "<red>金额无效：<white>{input}</white></red>"
+  admin-give: "<green>已给 <white>{player}</white> 增加 <white>{amount}</white></green>"
+  admin-take: "<green>已从 <white>{player}</white> 扣除 <white>{amount}</white></green>"
+  admin-set: "<green>已将 <white>{player}</white> 的余额设为 <white>{amount}</white></green>"
+  admin-price: "<green>已设置 {item} 价格：买入 <white>{buy}</white>，卖出 <white>{sell}</white></green>"
+  admin-reset-limit: "<green>已重置 <white>{player}</white> 的今日限额</green>"
+  admin-market-reset: "<green>已重置 <white>{item}</white> 的行情</green>"
+  reloaded: "<green>配置已重载：<white>{items}</white> 件商品，<white>{cats}</white> 个分类</green>"
+  gui-title-hub: "<dark_gray>商店</dark_gray>"
+  gui-title-buy: "<dark_gray>购买 · {category}</dark_gray>"
+  gui-title-sell: "<dark_gray>回收 · {category}</dark_gray>"
+  gui-title-bag: "<dark_gray>一键回收</dark_gray>"
+  gui-title-confirm: "<dark_gray>确认 · {item}</dark_gray>"

@@ -1,0 +1,625 @@
+# ===========================================================================
+#  FmShop 价格表
+#
+#  buy  = 玩家买入价（每个），0 或缺省 = 不出售
+#  sell = 玩家卖出价（每个），0 或缺省 = 不回收
+#
+#  【核心不变量】全表遵守 buy = 2 × sell。
+#  这个 100% 的买卖差价是反套利的根基：任何合成配方的产物价值不会超过
+#  材料价值之和，而材料买入价已是其卖出价的两倍，所以“买材料 → 合成 → 卖产物”
+#  永远亏损。方块类（9 合 1）按 9 倍精确定价，熔炼类保证“产物卖价 ≤ 原料买价”。
+#  /fsa doctor 会用服务器真实配方表复核全部组合，改价后请务必运行一次。
+#
+#  【定价梯度】按“获取难度 / 可自动化程度”分档，而非按稀有度：
+#    刷怪塔、铁傀儡农场、作物农场等可无限自动化产出的物品定价极低；
+#    受时运影响的矿物已按时运 III 的期望产量（约 2.2 倍）折算；
+#    无法量产的（下界之星、鞘壳、鞘翅）价格高，部分只卖不收作为金币回收口。
+#
+#  daily-buy / daily-sell = 每名玩家每日限额（件），0 = 不限
+#  dynamic.enabled        = 该商品价格随交易量浮动（买入推高、卖出压低）
+# ===========================================================================
+
+dynamic-defaults:
+  enabled: false
+  # 每交易 1 件物品，行情变动的基点数（100 基点 = 1%）
+  step-bp: 2
+  floor-percent: 50
+  ceil-percent: 200
+  # 每小时向 100% 回归的基点数
+  recover-bp-per-hour: 300
+
+categories:
+  ores:
+    name: "<gold>矿物</gold>"
+    icon: IRON_INGOT
+    order: 1
+  blocks:
+    name: "<gray>建材</gray>"
+    icon: STONE
+    order: 2
+  farm:
+    name: "<green>农牧</green>"
+    icon: WHEAT
+    order: 3
+  food:
+    name: "<red>食物</red>"
+    icon: COOKED_BEEF
+    order: 4
+  mob:
+    name: "<dark_purple>战利品</dark_purple>"
+    icon: ENDER_PEARL
+    order: 5
+  nether:
+    name: "<dark_red>下界</dark_red>"
+    icon: NETHERRACK
+    order: 6
+  misc:
+    name: "<aqua>杂项</aqua>"
+    icon: NAME_TAG
+    order: 7
+
+items:
+  # --------------------------- 矿物 ---------------------------
+  COAL:
+    category: ores
+    buy: 1.20
+    sell: 0.60
+    daily-sell: 4096
+    dynamic: { enabled: true, step-bp: 1 }
+  CHARCOAL:
+    category: ores
+    buy: 1.20
+    sell: 0.55
+  RAW_IRON:
+    category: ores
+    buy: 5.00
+    sell: 2.50
+  IRON_INGOT:
+    category: ores
+    buy: 6.00
+    sell: 3.00
+    daily-sell: 2048
+    dynamic: { enabled: true, step-bp: 2 }
+  RAW_COPPER:
+    category: ores
+    buy: 1.60
+    sell: 0.80
+  COPPER_INGOT:
+    category: ores
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 4096
+    dynamic: { enabled: true, step-bp: 1 }
+  RAW_GOLD:
+    category: ores
+    buy: 12.00
+    sell: 6.00
+  GOLD_INGOT:
+    category: ores
+    buy: 14.00
+    sell: 7.00
+    daily-sell: 1024
+    dynamic: { enabled: true, step-bp: 3 }
+  REDSTONE:
+    category: ores
+    buy: 1.00
+    sell: 0.50
+    daily-sell: 4096
+  LAPIS_LAZULI:
+    category: ores
+    buy: 2.40
+    sell: 1.20
+    daily-sell: 2048
+  DIAMOND:
+    category: ores
+    buy: 80.00
+    sell: 40.00
+    daily-sell: 256
+    dynamic: { enabled: true, step-bp: 20 }
+  EMERALD:
+    category: ores
+    buy: 30.00
+    sell: 15.00
+    daily-sell: 512
+    dynamic: { enabled: true, step-bp: 8 }
+  QUARTZ:
+    category: ores
+    buy: 2.00
+    sell: 1.00
+  AMETHYST_SHARD:
+    category: ores
+    buy: 4.00
+    sell: 2.00
+  ANCIENT_DEBRIS:
+    category: ores
+    buy: 260.00
+    sell: 130.00
+    daily-sell: 64
+  NETHERITE_SCRAP:
+    category: ores
+    buy: 240.00
+    sell: 120.00
+    daily-sell: 64
+  NETHERITE_INGOT:
+    category: ores
+    buy: 1000.00
+    sell: 500.00
+    daily-sell: 16
+  # 9 合 1 方块按 9 倍精确定价，正反合成都不产生差价
+  COAL_BLOCK:
+    category: ores
+    buy: 10.80
+    sell: 5.40
+  IRON_BLOCK:
+    category: ores
+    buy: 54.00
+    sell: 27.00
+  COPPER_BLOCK:
+    category: ores
+    buy: 18.00
+    sell: 9.00
+  GOLD_BLOCK:
+    category: ores
+    buy: 126.00
+    sell: 63.00
+  REDSTONE_BLOCK:
+    category: ores
+    buy: 9.00
+    sell: 4.50
+  LAPIS_BLOCK:
+    category: ores
+    buy: 21.60
+    sell: 10.80
+  DIAMOND_BLOCK:
+    category: ores
+    buy: 720.00
+    sell: 360.00
+  EMERALD_BLOCK:
+    category: ores
+    buy: 270.00
+    sell: 135.00
+
+  # --------------------------- 建材 ---------------------------
+  COBBLESTONE:
+    category: blocks
+    buy: 0.02
+    sell: 0.01
+  STONE:
+    category: blocks
+    buy: 0.04
+    sell: 0.02
+  DEEPSLATE:
+    category: blocks
+    buy: 0.02
+    sell: 0.01
+  COBBLED_DEEPSLATE:
+    category: blocks
+    buy: 0.02
+    sell: 0.01
+  DIRT:
+    category: blocks
+    buy: 0.02
+    sell: 0.01
+  SAND:
+    category: blocks
+    buy: 0.06
+    sell: 0.03
+  RED_SAND:
+    category: blocks
+    buy: 0.06
+    sell: 0.03
+  GRAVEL:
+    category: blocks
+    buy: 0.06
+    sell: 0.03
+  CLAY_BALL:
+    category: blocks
+    buy: 0.20
+    sell: 0.10
+  OAK_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  SPRUCE_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  BIRCH_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  JUNGLE_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  ACACIA_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  DARK_OAK_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  MANGROVE_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  CHERRY_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  PALE_OAK_LOG:
+    category: blocks
+    buy: 0.80
+    sell: 0.40
+  OAK_PLANKS:
+    category: blocks
+    buy: 0.10
+    sell: 0.05
+  STICK:
+    category: blocks
+    buy: 0.04
+    sell: 0.02
+  OBSIDIAN:
+    category: blocks
+    buy: 3.00
+    sell: 1.50
+  GLOWSTONE:
+    category: blocks
+    buy: 1.60
+    sell: 0.80
+  ICE:
+    category: blocks
+    buy: 0.40
+    sell: 0.20
+  SNOWBALL:
+    category: blocks
+    buy: 0.04
+    sell: 0.02
+  MOSS_BLOCK:
+    category: blocks
+    buy: 1.00
+    sell: 0.50
+  PRISMARINE_SHARD:
+    category: blocks
+    buy: 1.00
+    sell: 0.50
+  PRISMARINE_CRYSTALS:
+    category: blocks
+    buy: 2.00
+    sell: 1.00
+  SPONGE:
+    category: blocks
+    buy: 20.00
+    sell: 10.00
+
+  # --------------------------- 农牧 ---------------------------
+  WHEAT:
+    category: farm
+    buy: 0.30
+    sell: 0.15
+    daily-sell: 8192
+  CARROT:
+    category: farm
+    buy: 0.24
+    sell: 0.12
+    daily-sell: 8192
+  POTATO:
+    category: farm
+    buy: 0.24
+    sell: 0.12
+    daily-sell: 8192
+  BEETROOT:
+    category: farm
+    buy: 0.30
+    sell: 0.15
+  SUGAR_CANE:
+    category: farm
+    buy: 0.20
+    sell: 0.10
+    daily-sell: 8192
+  BAMBOO:
+    category: farm
+    buy: 0.10
+    sell: 0.05
+  MELON_SLICE:
+    category: farm
+    buy: 0.12
+    sell: 0.06
+  PUMPKIN:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  COCOA_BEANS:
+    category: farm
+    buy: 0.80
+    sell: 0.40
+  NETHER_WART:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  CACTUS:
+    category: farm
+    buy: 0.40
+    sell: 0.20
+  KELP:
+    category: farm
+    buy: 0.10
+    sell: 0.05
+  SWEET_BERRIES:
+    category: farm
+    buy: 0.30
+    sell: 0.15
+  GLOW_BERRIES:
+    category: farm
+    buy: 0.80
+    sell: 0.40
+  BROWN_MUSHROOM:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  RED_MUSHROOM:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  EGG:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  HONEYCOMB:
+    category: farm
+    buy: 2.40
+    sell: 1.20
+  WHITE_WOOL:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  LEATHER:
+    category: farm
+    buy: 2.00
+    sell: 1.00
+  FEATHER:
+    category: farm
+    buy: 0.40
+    sell: 0.20
+
+  # --------------------------- 食物 ---------------------------
+  BEEF:
+    category: food
+    buy: 1.00
+    sell: 0.50
+  PORKCHOP:
+    category: food
+    buy: 1.00
+    sell: 0.50
+  CHICKEN:
+    category: food
+    buy: 0.80
+    sell: 0.40
+  MUTTON:
+    category: food
+    buy: 0.80
+    sell: 0.40
+  RABBIT:
+    category: food
+    buy: 0.80
+    sell: 0.40
+  COD:
+    category: food
+    buy: 0.80
+    sell: 0.40
+  SALMON:
+    category: food
+    buy: 1.00
+    sell: 0.50
+  # 熔炼产物卖价低于原料买价，烤肉不能套利
+  COOKED_BEEF:
+    category: food
+    buy: 1.60
+    sell: 0.80
+  COOKED_PORKCHOP:
+    category: food
+    buy: 1.60
+    sell: 0.80
+  COOKED_CHICKEN:
+    category: food
+    buy: 1.20
+    sell: 0.60
+  BREAD:
+    category: food
+    buy: 1.00
+    sell: 0.50
+  APPLE:
+    category: food
+    buy: 2.00
+    sell: 1.00
+  GOLDEN_APPLE:
+    category: food
+    buy: 180.00
+    sell: 90.00
+  HONEY_BOTTLE:
+    category: food
+    buy: 3.00
+    sell: 1.50
+
+  # --------------------------- 战利品 ---------------------------
+  ROTTEN_FLESH:
+    category: mob
+    buy: 0.10
+    sell: 0.05
+    daily-sell: 8192
+  BONE:
+    category: mob
+    buy: 0.50
+    sell: 0.25
+    daily-sell: 8192
+  STRING:
+    category: mob
+    buy: 0.60
+    sell: 0.30
+  SPIDER_EYE:
+    category: mob
+    buy: 0.80
+    sell: 0.40
+  GUNPOWDER:
+    category: mob
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 2048
+    dynamic: { enabled: true, step-bp: 2 }
+  SLIME_BALL:
+    category: mob
+    buy: 2.00
+    sell: 1.00
+  MAGMA_CREAM:
+    category: mob
+    buy: 4.40
+    sell: 2.20
+  BLAZE_ROD:
+    category: mob
+    buy: 6.00
+    sell: 3.00
+    daily-sell: 1024
+  ENDER_PEARL:
+    category: mob
+    buy: 8.00
+    sell: 4.00
+    daily-sell: 512
+  GHAST_TEAR:
+    category: mob
+    buy: 16.00
+    sell: 8.00
+  PHANTOM_MEMBRANE:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  INK_SAC:
+    category: mob
+    buy: 0.80
+    sell: 0.40
+  GLOW_INK_SAC:
+    category: mob
+    buy: 2.40
+    sell: 1.20
+  NAUTILUS_SHELL:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  HEART_OF_THE_SEA:
+    category: mob
+    buy: 400.00
+    sell: 200.00
+  SHULKER_SHELL:
+    category: mob
+    buy: 80.00
+    sell: 40.00
+    daily-sell: 128
+  TOTEM_OF_UNDYING:
+    category: mob
+    buy: 600.00
+    sell: 300.00
+    daily-sell: 64
+  NETHER_STAR:
+    category: mob
+    buy: 800.00
+    sell: 400.00
+    daily-sell: 16
+  DRAGON_BREATH:
+    category: mob
+    buy: 20.00
+    sell: 10.00
+
+  # --------------------------- 下界 ---------------------------
+  NETHERRACK:
+    category: nether
+    buy: 0.02
+    sell: 0.01
+  SOUL_SAND:
+    category: nether
+    buy: 0.20
+    sell: 0.10
+  SOUL_SOIL:
+    category: nether
+    buy: 0.20
+    sell: 0.10
+  MAGMA_BLOCK:
+    category: nether
+    buy: 1.00
+    sell: 0.50
+  BLACKSTONE:
+    category: nether
+    buy: 0.10
+    sell: 0.05
+  BASALT:
+    category: nether
+    buy: 0.10
+    sell: 0.05
+  GILDED_BLACKSTONE:
+    category: nether
+    buy: 10.00
+    sell: 5.00
+  CRYING_OBSIDIAN:
+    category: nether
+    buy: 8.00
+    sell: 4.00
+  CRIMSON_STEM:
+    category: nether
+    buy: 0.80
+    sell: 0.40
+  WARPED_STEM:
+    category: nether
+    buy: 0.80
+    sell: 0.40
+  SHROOMLIGHT:
+    category: nether
+    buy: 3.00
+    sell: 1.50
+  TWISTING_VINES:
+    category: nether
+    buy: 0.40
+    sell: 0.20
+
+  # --------------------------- 杂项 ---------------------------
+  NAME_TAG:
+    category: misc
+    buy: 40.00
+    sell: 20.00
+  # 皮革 ×3 + 铁锭 ×1 = 材料买入 12.00，卖出上限即 12.00 的一半（守住 buy = 2 × sell）
+  SADDLE:
+    category: misc
+    buy: 12.00
+    sell: 6.00
+  # 线 ×5 → 拴绳 ×2：材料买入 3.00，两条拴绳卖出合计 2.00，合成必亏
+  LEAD:
+    category: misc
+    buy: 2.00
+    sell: 1.00
+  BOOK:
+    category: misc
+    buy: 3.00
+    sell: 1.50
+  PAPER:
+    category: misc
+    buy: 0.30
+    sell: 0.15
+  FLINT:
+    category: misc
+    buy: 0.20
+    sell: 0.10
+  BUCKET:
+    category: misc
+    buy: 20.00
+    sell: 9.00
+  # 只卖不收：金币回收口，防止倒卖回流
+  EXPERIENCE_BOTTLE:
+    category: misc
+    buy: 8.00
+    daily-buy: 512
+  ELYTRA:
+    category: misc
+    buy: 1500.00
+    daily-buy: 4
+  ENCHANTED_GOLDEN_APPLE:
+    category: misc
+    buy: 2000.00
+    daily-buy: 8
