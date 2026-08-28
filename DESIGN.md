@@ -1,4 +1,4 @@
-# FmKit 设计方案 v1.1（与实现对齐）
+# FmKit 设计方案 v1.2（与实现对齐）
 
 > 扫地不再删除，而是分类收进回收站。单插件、原创底层、可开源。
 > 目标平台：Folia/Paper 1.20+（实测 26.1.2 / 26.2），编译目标 Java 21。
@@ -362,6 +362,8 @@ FmKit/
     command/
       FmKitCommand.java
       FmKitAdminCommand.java
+    papi/
+      FmKitPlaceholders.java   # PlaceholderAPI 扩展（%fmkit_*%，软依赖）
     util/
       ItemNames.java           # ItemStack → 中文显示名
       TimeUtil.java            # 游戏日↔毫秒换算、倒计时格式化
@@ -401,4 +403,18 @@ FmKit/
 
 ---
 
-**以上为与实现对齐的方案基线（v1.1）。**
+## 14. PlaceholderAPI 扩展（1.2）
+
+`papi/FmKitPlaceholders` 注册扩展 `fmkit`（identifier 小写，`persist() = true`，重写 `onRequest` 使玩家作用域与服务器作用域都可用；未知参数返回 `null`，任何异常兜底返回 `null`，绝不抛出）。`plugin.yml` 声明 `softdepend: [PlaceholderAPI]`；`onEnable` 末尾判断插件存在才注册，整段 `try/catch (Throwable)` 只打 WARNING，没装 PAPI 照常启用；`onDisable` 调 `unregister()`。
+
+**异步安全约束（硬）**：TAB 在异步线程刷新占位符，`onRequest` 只允许读三类状态——
+
+1. **volatile 字段**：`SweepScheduler.nextCleanAt` / `lastSweepEntries` / `lastSweepItems`（上轮统计在清扫收尾的 done-token 里写入，初始 -1 表示"未扫过"）；`cleanTask` 引用改 volatile 供 `isRunning()` 异步读；
+2. **并发容器 / 自带锁的 store**：`PrivateBinStore.bins`（ConcurrentHashMap）、`size()/snapshot()`（synchronized on bin）、`PublicBinStore.size()`（synchronized）；
+3. **配置快照**：容量上限、清扫间隔、回收默认开关这类 FileConfiguration 衍生值，由主线程在 onEnable / `/fmkitadmin reload` 时写入扩展内的 volatile 字段，异步线程只读快照，不直接读配置。
+
+禁止项：不访问 world/entity/inventory API，不做 IO，不阻塞，不调 `Bukkit.getOnlinePlayers()`。
+
+---
+
+**以上为与实现对齐的方案基线（v1.2）。**

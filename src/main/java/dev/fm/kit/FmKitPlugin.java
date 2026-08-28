@@ -9,6 +9,8 @@ import dev.fm.kit.cleaner.SweepScheduler;
 import dev.fm.kit.command.FmKitAdminCommand;
 import dev.fm.kit.command.FmKitCommand;
 import dev.fm.kit.gui.GuiListener;
+import dev.fm.kit.papi.FmKitPlaceholders;
+import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -25,6 +27,7 @@ public final class FmKitPlugin extends JavaPlugin {
     private SweepScheduler sweep;
     private BinExpiryTask expiry;
     private BinLogger binLogger;
+    private FmKitPlaceholders papi;
 
     public static FmKitPlugin instance() {
         return instance;
@@ -66,10 +69,29 @@ public final class FmKitPlugin extends JavaPlugin {
         PluginCommand admin = getCommand("fmkitadmin");
         admin.setExecutor(ac);
         admin.setTabCompleter(ac);
+
+        // 软依赖 PlaceholderAPI：装了才注册，没装照常启用
+        if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            try {
+                papi = new FmKitPlaceholders(this);
+                papi.register();
+                getLogger().info("已注册 PlaceholderAPI 占位符扩展 %fmkit_*%");
+            } catch (Throwable t) {
+                papi = null;
+                getLogger().warning("PlaceholderAPI 占位符注册失败: " + t.getMessage());
+            }
+        }
     }
 
     @Override
     public void onDisable() {
+        if (papi != null) {
+            try {
+                papi.unregister();
+            } catch (Throwable ignored) {
+            }
+            papi = null;
+        }
         if (sweep != null) {
             sweep.stopTasks();
         }
@@ -93,6 +115,9 @@ public final class FmKitPlugin extends JavaPlugin {
         sweep.applyConfig();
         expiry.stop();
         expiry.start();
+        if (papi != null) {
+            papi.refreshConfigCache();
+        }
     }
 
     public Settings settings() {

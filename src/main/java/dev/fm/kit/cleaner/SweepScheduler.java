@@ -30,12 +30,15 @@ public final class SweepScheduler {
 
     private final FmKitPlugin plugin;
     private final AtomicBoolean cleaning = new AtomicBoolean(false);
-    private ScheduledTask cleanTask;
+    private volatile ScheduledTask cleanTask;
     private ScheduledTask countdownTask;
     private ScheduledTask thresholdTask;
     private volatile boolean wanted = true;
     private volatile long nextCleanAt;
     private long lastBroadcastSec = -1;
+    /** 上轮清扫统计（占位符用）：volatile，异步线程只读。-1 = 尚未清扫过。 */
+    private volatile int lastSweepEntries = -1;
+    private volatile int lastSweepItems = -1;
 
     public SweepScheduler(FmKitPlugin plugin) {
         this.plugin = plugin;
@@ -47,6 +50,20 @@ public final class SweepScheduler {
 
     public boolean isRunning() {
         return cleanTask != null;
+    }
+    /** 下一次清扫的 epoch 毫秒（volatile，异步可读）。 */
+    public long nextCleanAt() {
+        return nextCleanAt;
+    }
+
+    /** 上轮清扫收走的堆叠数，-1 = 尚未清扫过。 */
+    public int lastSweepEntries() {
+        return lastSweepEntries;
+    }
+
+    /** 上轮清扫收走的物品总个数，-1 = 尚未清扫过。 */
+    public int lastSweepItems() {
+        return lastSweepItems;
     }
 
     /** Runtime toggle via /fmkitadmin sweep. */
@@ -149,6 +166,8 @@ public final class SweepScheduler {
         Runnable done = () -> {
             if (remaining.decrementAndGet() == 0) {
                 cleaning.set(false);
+                lastSweepEntries = collected.get();
+                lastSweepItems = amount.get();
                 plugin.binLogger().sweepRound(collected.get(), amount.get(), publicCount.get());
                 TextUtil.broadcast(TextUtil.apply(s.msg("cleaned"),
                         "n", String.valueOf(collected.get()), "m", String.valueOf(amount.get())));

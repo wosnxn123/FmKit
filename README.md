@@ -31,7 +31,7 @@ FmKit 是一个 Minecraft 服务端插件（Folia / Paper）。传统扫地插�
 
 ## 安装
 
-1. 将 `FmKit-1.1.2.jar` 放入服务端 `plugins/` 目录；
+1. 将 `FmKit-1.2.0.jar` 放入服务端 `plugins/` 目录；
 2. 启动服务端，首次运行自动生成 `plugins/FmKit/config.yml` 与 `bins/` 存档目录；
 3. 游戏内输入 `/fmkit` 打开回收站。
 
@@ -76,9 +76,30 @@ FmKit 是一个 Minecraft 服务端插件（Folia / Paper）。传统扫地插�
 
 | 构建脚本 | 产物 |
 |---|---|
-| `build.ps1` | `target/FmKit-1.1.2.jar` |
+| `build.ps1` | `target/FmKit-1.2.0.jar` |
 
 详细步骤见 [构建与测试](docs/构建与测试.md)。
+
+## PlaceholderAPI 占位符
+
+装上 [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) 后自动注册扩展 `fmkit`（软依赖，没装照常启用），TAB 的 tablist/侧边栏/BossBar 可直接使用：
+
+| 占位符 | 含义 | 作用域 | 示例值 |
+|---|---|---|---|
+| `%fmkit_private_entries%` | 自己私人回收站的条目数 | 玩家 | `5` |
+| `%fmkit_private_max%` | 私人回收站容量上限（配置，0 显示"不限"） | 玩家 | `54` |
+| `%fmkit_private_collect%` | 自己的回收开关状态 | 玩家 | `开启` |
+| `%fmkit_private_next_expiry%` | 私人箱最早一条的剩余保留时间（空箱显示"无"） | 玩家 | `2天3小时` |
+| `%fmkit_public_entries%` | 公共回收站当前条目数 | 服务器 | `128` |
+| `%fmkit_public_max%` | 公共回收站容量上限（配置） | 服务器 | `512` |
+| `%fmkit_sweep_countdown%` | 距下次清扫的秒数（清扫关闭显示 `-`） | 服务器 | `42` |
+| `%fmkit_sweep_countdown_formatted%` | 同上，`分:秒` 格式 | 服务器 | `4:32` |
+| `%fmkit_sweep_enabled%` | 周期清扫是否在跑 | 服务器 | `开启` |
+| `%fmkit_sweep_interval%` | 清扫周期（秒，配置） | 服务器 | `300` |
+| `%fmkit_last_sweep_entries%` | 上轮清扫收走的堆叠数（未扫过显示 `-`） | 服务器 | `37` |
+| `%fmkit_last_sweep_items%` | 上轮清扫收走的物品总个数 | 服务器 | `214` |
+
+占位符在异步线程刷新是安全的：全部读内存中的并发容器 / `volatile` 快照，不碰世界实体、不做 IO（实现细节见 [DESIGN.md](DESIGN.md) 第 14 节）。
 
 ## 自动化测试
 

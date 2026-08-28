@@ -12,6 +12,6 @@ $ErrorActionPreference = "Continue"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Copy-Item "$root\src\main\resources\config.yml" "$root\target\classes\config.yml" -Force
 Copy-Item "$root\src\main\resources\plugin.yml" "$root\target\classes\plugin.yml" -Force
-& jar cf "$root\target\FmKit-1.1.2.jar" -C "$root\target\classes" .
+& jar cf "$root\target\FmKit-1.2.0.jar" -C "$root\target\classes" .
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Output "BUILD_OK"

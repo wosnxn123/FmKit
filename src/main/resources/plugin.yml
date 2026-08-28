@@ -1,8 +1,9 @@
 name: FmKit
-version: 1.1.2
+version: 1.2.0
 main: dev.fm.kit.FmKitPlugin
 api-version: '26.1'
 folia-supported: true
+softdepend: [PlaceholderAPI]
 description: Sweeps ground items into private/public recycle bins instead of deleting them.
 author: Fm
 commands:
