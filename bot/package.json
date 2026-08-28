@@ -1,13 +1,12 @@
 {
-  "name": "fm-bot-tests",
+  "name": "fmkit-bot-tests",
   "version": "1.0.0",
-  "description": "FmKit / FmShop 的 mineflayer + RCON 端到端测试机器人",
+  "description": "FmKit 的 mineflayer + RCON 端到端测试机器人",
   "private": true,
   "license": "GPL-3.0-or-later",
   "type": "commonjs",
   "scripts": {
-    "test:shop": "node fmshop_test.js",
-    "test:kit": "node fmkit_test.js"
+    "test": "node fmkit_test.js"
   },
   "dependencies": {
     "minecraft-data": "^3.113.2",

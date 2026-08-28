@@ -12,6 +12,7 @@ versions/
 logs/
 
 # ---- 独立项目，不属于本仓库 ----
+FmShop/
 FmTerm/
 FmYunbei/
 FmOptimizer/
