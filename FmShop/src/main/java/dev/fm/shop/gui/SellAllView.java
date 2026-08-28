@@ -5,7 +5,6 @@ import dev.fm.shop.store.PlayerData;
 import dev.fm.shop.store.PriceEntry;
 import dev.fm.shop.tx.TxEngine;
 import dev.fm.shop.tx.TxReport;
-import dev.fm.shop.util.ItemNames;
 import dev.fm.shop.util.Money;
 import net.kyori.adventure.text.Component;
 import org.bukkit.GameMode;
@@ -23,7 +22,7 @@ import java.util.Map;
  * Preview of a bulk sell: every priced stack in the inventory, what it pays, and
  * one button to commit.
  *
- * <p>The preview applies the same per-material clamps the engine will
+ * <p>The preview applies the same per-row clamps the engine will
  * ({@code max-per-action}, daily quota), so the total shown is the total paid
  * unless prices move between preview and click.
  */
@@ -34,7 +33,7 @@ public final class SellAllView extends View {
     private static final int SLOT_TOTAL = 49;
     private static final int SLOT_CONFIRM = 53;
 
-    private record Line(Material material, int qty, long gross, long fee) {
+    private record Line(PriceEntry entry, int qty, long gross, long fee) {
     }
 
     private final List<Line> lines = new ArrayList<>();
@@ -66,8 +65,8 @@ public final class SellAllView extends View {
             }
             Line l = lines.get(slot);
             long net = l.gross() - l.fee();
-            getInventory().setItem(slot, Icons.of(l.material(), Math.min(64, l.qty()),
-                    "<white>" + ItemNames.plain(l.material()) + " <gray>×<white>" + l.qty(),
+            getInventory().setItem(slot, Icons.of(l.entry().probe(), l.qty(),
+                    "<white>" + l.entry().key().mini() + " <gray>×<white>" + l.qty(),
                     List.of("<gold>可得 <white>" + Money.format(net, cur),
                             "<gray>单价 <white>" + Money.format(l.gross() / Math.max(1, l.qty()), cur))));
         }
@@ -119,7 +118,7 @@ public final class SellAllView extends View {
         }
     }
 
-    /** Groups the inventory into per-material sell lines with fees applied. */
+    /** Groups the inventory into per-row sell lines with fees applied. */
     private void scan() {
         lines.clear();
         gross = 0;
@@ -127,34 +126,36 @@ public final class SellAllView extends View {
         if (player.getGameMode() == GameMode.CREATIVE) {
             return;
         }
-        Map<Material, Integer> held = new LinkedHashMap<>();
+        // Dedupe by row, not material: two enchanted books are the same material
+        // but different rows, and match() already rejects unexpected NBT.
+        Map<PriceEntry, Integer> held = new LinkedHashMap<>();
         for (ItemStack it : player.getInventory().getStorageContents()) {
             if (it == null || it.getType().isAir()) {
                 continue;
             }
-            PriceEntry e = plugin.prices().get(it.getType());
-            if (e == null || !e.sellable() || !it.isSimilar(new ItemStack(it.getType()))) {
+            PriceEntry e = plugin.prices().match(it);
+            if (e == null || !e.sellable()) {
                 continue;
             }
-            held.merge(it.getType(), it.getAmount(), Integer::sum);
+            held.merge(e, it.getAmount(), Integer::sum);
         }
         long now = System.currentTimeMillis();
         long today = plugin.settings().today();
         PlayerData d = plugin.data().loadSync(player.getUniqueId());
         boolean exempt = player.hasPermission(TxEngine.FEE_EXEMPT);
         int bp = plugin.settings().sellFeeBp();
-        for (Map.Entry<Material, Integer> en : held.entrySet()) {
-            PriceEntry e = plugin.prices().get(en.getKey());
+        for (Map.Entry<PriceEntry, Integer> en : held.entrySet()) {
+            PriceEntry e = en.getKey();
             int qty = Math.min(en.getValue(), plugin.settings().maxPerAction());
             if (e.dailySell() > 0) {
-                qty = Math.min(qty, Math.max(0, e.dailySell() - d.soldToday(e.material(), today)));
+                qty = Math.min(qty, Math.max(0, e.dailySell() - d.soldToday(e.id(), today)));
             }
             if (qty <= 0) {
                 continue;
             }
             long g = Money.times(plugin.market().sellUnit(e, now), qty);
             long f = exempt ? 0 : Money.basisPoints(g, bp);
-            lines.add(new Line(en.getKey(), qty, g, f));
+            lines.add(new Line(e, qty, g, f));
             gross = Money.add(gross, g);
             fee = Money.add(fee, f);
         }

@@ -1,6 +1,5 @@
 package dev.fm.shop.store;
 
-import dev.fm.shop.util.ItemNames;
 import dev.fm.shop.util.Money;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -13,8 +12,11 @@ import org.bukkit.inventory.ShapelessRecipe;
 import org.bukkit.inventory.StonecuttingRecipe;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -38,8 +40,8 @@ import java.util.Set;
 public final class PriceDoctor {
 
     public enum Severity { ERROR, WARN, INFO }
-    /** {@code subject} is the priced item at fault, or null for table-level notes. */
-    public record Finding(Severity severity, Material subject, String text) {
+    /** {@code subject} is the price row at fault, or null for table-level notes. */
+    public record Finding(Severity severity, PriceEntry subject, String text) {
     }
 
     private PriceDoctor() {
@@ -57,19 +59,25 @@ public final class PriceDoctor {
         for (Category c : cat.categories()) {
             declared.add(c.id());
         }
+        // One pass over the recipe registry, not one per item: getRecipesFor()
+        // re-walks and re-converts every recipe on each call, so asking it 1374
+        // times froze the global region for seconds (Folia watchdog).
+        Map<Material, List<Recipe>> byResult = recipesByResult();
         for (PriceEntry e : cat.all()) {
             if (!declared.contains(e.category())) {
                 out.add(new Finding(Severity.WARN, null,
-                        ItemNames.plain(e.material()) + " 的分类 " + e.category() + " 未定义，界面中不可见"));
+                        e.key().plainName() + " 的分类 " + e.category() + " 未定义，界面中不可见"));
             }
             if (e.buyable() && e.sellable() && e.sell() >= e.buy()) {
-                out.add(new Finding(Severity.ERROR, e.material(),
-                        ItemNames.plain(e.material()) + " 买卖价倒挂：买入 "
+                out.add(new Finding(Severity.ERROR, e,
+                        e.key().plainName() + " 买卖价倒挂：买入 "
                                 + Money.format(e.buy()) + " ≤ 卖出 " + Money.format(e.sell())
                                 + "，可无限刷钱"));
             }
-            if (e.sellable()) {
-                checkRecipes(cat, e, out);
+            // Variant rows have no recipe identity - vanilla recipes produce
+            // materials, never a specific book - so the check cannot apply.
+            if (e.sellable() && e.key().plain()) {
+                checkRecipes(cat, byResult.getOrDefault(e.material(), List.of()), e, out);
             }
         }
         return out;
@@ -82,7 +90,7 @@ public final class PriceDoctor {
     public static int enforce(PriceCatalog cat, List<Finding> findings) {
         int pulled = 0;
         for (Finding f : findings) {
-            if (f.severity() == Severity.ERROR && f.subject() != null && cat.remove(f.subject())) {
+            if (f.severity() == Severity.ERROR && f.subject() != null && cat.remove(f.subject().id())) {
                 pulled++;
             }
         }
@@ -100,13 +108,45 @@ public final class PriceDoctor {
         return worst;
     }
 
-    private static void checkRecipes(PriceCatalog cat, PriceEntry product, List<Finding> out) {
-        List<Recipe> recipes;
+    /**
+     * Every recipe in the registry bucketed by the material it produces. A recipe
+     * the server cannot convert to its Bukkit form is skipped, not fatal: one bad
+     * row must not blind the checker to the rest of the table.
+     */
+    private static Map<Material, List<Recipe>> recipesByResult() {
+        Map<Material, List<Recipe>> map = new HashMap<>();
+        Iterator<Recipe> it;
         try {
-            recipes = Bukkit.getRecipesFor(new ItemStack(product.material()));
+            it = Bukkit.recipeIterator();
         } catch (RuntimeException ex) {
-            return;
+            return map;
         }
+        while (true) {
+            try {
+                if (!it.hasNext()) {
+                    break;
+                }
+            } catch (RuntimeException ex) {
+                break;
+            }
+            Recipe r;
+            ItemStack result;
+            try {
+                r = it.next();
+                result = r == null ? null : r.getResult();
+            } catch (RuntimeException ex) {
+                continue;           // next() already advanced the cursor
+            }
+            if (result == null || result.getType() == Material.AIR) {
+                continue;
+            }
+            map.computeIfAbsent(result.getType(), k -> new ArrayList<>(2)).add(r);
+        }
+        return map;
+    }
+
+    private static void checkRecipes(PriceCatalog cat, List<Recipe> recipes,
+                                     PriceEntry product, List<Finding> out) {
         for (Recipe r : recipes) {
             List<RecipeChoice> inputs = inputsOf(r);
             if (inputs.isEmpty()) {
@@ -127,13 +167,13 @@ public final class PriceDoctor {
             if (revenue <= cost) {
                 continue;
             }
-            String desc = ItemNames.plain(product.material()) + " ×" + made
+            String desc = product.key().plainName() + " ×" + made
                     + " 卖出 " + Money.format(revenue)
                     + " > 材料买入 " + Money.format(cost)
                     + "（配方 " + describe(r) + "）";
             out.add(unpriced == 0
-                    ? new Finding(Severity.ERROR, product.material(), "合成套利：" + desc)
-                    : new Finding(Severity.WARN, product.material(),
+                    ? new Finding(Severity.ERROR, product, "合成套利：" + desc)
+                    : new Finding(Severity.WARN, product,
                             "疑似合成套利（" + unpriced + " 种材料商店不出售）：" + desc));
         }
     }
@@ -141,9 +181,17 @@ public final class PriceDoctor {
     private static List<RecipeChoice> inputsOf(Recipe r) {
         List<RecipeChoice> list = new ArrayList<>(9);
         if (r instanceof ShapedRecipe shaped) {
-            for (RecipeChoice c : shaped.getChoiceMap().values()) {
-                if (c != null) {
-                    list.add(c);
+            // getChoiceMap() is keyed by pattern char, so a 3x3 grid of one key
+            // is a single entry there while the player must hand over nine
+            // items. Count every occupied slot, or 9-in-1 blocks price out at
+            // one ingredient and every mineral block looks like arbitrage.
+            Map<Character, RecipeChoice> keys = shaped.getChoiceMap();
+            for (String row : shaped.getShape()) {
+                for (int i = 0; i < row.length(); i++) {
+                    RecipeChoice c = keys.get(row.charAt(i));
+                    if (c != null) {
+                        list.add(c);
+                    }
                 }
             }
         } else if (r instanceof ShapelessRecipe shapeless) {
@@ -167,13 +215,13 @@ public final class PriceDoctor {
         long best = -1;
         if (choice instanceof RecipeChoice.MaterialChoice mc) {
             for (Material m : mc.getChoices()) {
-                best = better(best, cat.get(m));
+                best = better(best, cat.plain(m));
             }
         } else if (choice instanceof RecipeChoice.ExactChoice ec) {
             for (ItemStack it : ec.getChoices()) {
                 // An exact-NBT slot cannot be filled with a plain shop item.
                 if (it != null && !it.hasItemMeta()) {
-                    best = better(best, cat.get(it.getType()));
+                    best = better(best, cat.plain(it.getType()));
                 }
             }
         }

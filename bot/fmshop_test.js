@@ -111,6 +111,18 @@ async function openGui(bot, cmd) {
   return win
 }
 
+/**
+ * Waits for a window other than `prevId` to become current. The hub, category
+ * pages and the sell-all preview are all 54 slots, so interior size alone no
+ * longer tells one screen from the next - only the window id does.
+ */
+function waitWindow(bot, prevId, size, timeoutMs = 6000) {
+  return waitFor(() => (bot.currentWindow
+    && bot.currentWindow.id !== prevId
+    && bot.currentWindow.inventoryStart === size)
+    ? bot.currentWindow : null, timeoutMs)
+}
+
 function closeGui(bot) {
   if (bot.currentWindow) { try { bot.closeWindow(bot.currentWindow) } catch { } }
 }
@@ -125,6 +137,57 @@ const titleOf = win => {
   try { return typeof win.title === 'string' ? win.title : JSON.stringify(win.title) } catch { return '' }
 }
 
+/** Unwrap prismarine-nbt {type,value} envelopes into plain JS. */
+function plain(n) {
+  if (n == null || typeof n !== 'object') return n
+  if (Array.isArray(n)) return n.map(plain)
+  if (typeof n.type === 'string' && 'value' in n) return plain(n.value)
+  const o = {}
+  for (const [k, v] of Object.entries(n)) o[k] = plain(v)
+  return o
+}
+
+/**
+ * Flatten a chat component (JSON or NBT) to plain text. Own `text` comes before
+ * `extra`: key order in the wire compound is not reading order.
+ */
+function textOf(node) {
+  const walk = n => {
+    if (n == null) return ''
+    if (typeof n === 'string') return n
+    if (typeof n !== 'object') return ''
+    if (Array.isArray(n)) return n.map(walk).join('')
+    // a style-less child arrives as a bare NBT string, keyed ""
+    const own = typeof n.text === 'string' ? n.text : (typeof n[''] === 'string' ? n[''] : '')
+    return own + (n.extra ? walk(n.extra) : '')
+  }
+  return strip(walk(plain(node)))
+}
+
+/** An icon's display name; the server may send it as a component or as NBT. */
+function iconName(it) {
+  if (!it) return ''
+  const comp = it.components && it.components.find
+    ? it.components.find(c => c.type === 'custom_name' || c.type === 8)
+    : null
+  const custom = it.customName ? textOf(it.customName) : ''
+  const raw = it.nbt ? textOf(it.nbt.value?.display?.value?.Name) : ''
+  return (custom || raw || (comp ? textOf(comp.data) : '')).trim()
+}
+
+/** An icon's lore lines, flattened to plain text. */
+function loreOf(it) {
+  if (!it) return []
+  const comp = it.components && it.components.find
+    ? it.components.find(c => c.type === 'lore' || c.type === 9)
+    : null
+  let src = comp ? comp.data : null
+  if (src && !Array.isArray(src) && Array.isArray(src.lines)) src = src.lines
+  if (!src && it.nbt) src = plain(it.nbt).display?.Lore
+  if (!src) return []
+  return (Array.isArray(src) ? src : [src]).map(textOf)
+}
+
 /** Container slot holding `name`, searching only the item grid. */
 function slotOf(win, name, limit) {
   const max = Math.min(limit == null ? win.inventoryStart : limit, win.inventoryStart)
@@ -135,9 +198,13 @@ function slotOf(win, name, limit) {
   return -1
 }
 
-const HUB_CATEGORIES = [10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25]
-const HUB_BALANCE = 29, HUB_SELL_ALL = 31, HUB_CLOSE = 33
-const CAT_BALANCE = 47, CAT_BACK = 49, CAT_PAGE = 51
+const HUB_CATEGORIES = [
+  10, 11, 12, 13, 14, 15, 16,
+  19, 20, 21, 22, 23, 24, 25,
+  28, 29, 30, 31, 32, 33, 34,
+]
+const HUB_BALANCE = 47, HUB_SELL_ALL = 49, HUB_CLOSE = 51
+const CAT_PREV = 45, CAT_BALANCE = 47, CAT_BACK = 49, CAT_PAGE = 51, CAT_NEXT = 53
 const CFM_MINUS_1 = 12, CFM_PREVIEW = 13, CFM_PLUS_1 = 14, CFM_PLUS_64 = 16
 const CFM_STACK = 21, CFM_CONFIRM = 22, CFM_MAX = 23
 const ALL_BACK = 45, ALL_TOTAL = 49, ALL_CONFIRM = 53
@@ -148,16 +215,15 @@ const ALL_BACK = 45, ALL_TOTAL = 49, ALL_CONFIRM = 53
  */
 async function openConfirm(bot, name, catSlot) {
   for (let attempt = 0; attempt < 2; attempt++) {
-    if (!await openGui(bot, '/fmshop')) continue
+    const hub = await openGui(bot, '/fmshop')
+    if (!hub) continue
     await click(bot, catSlot, 0, 0)
-    const cat = await waitFor(() => bot.currentWindow && bot.currentWindow.inventoryStart === 54, 6000)
-      ? bot.currentWindow : null
+    const cat = await waitWindow(bot, hub.id, 54)
     if (!cat) continue
     const s = slotOf(cat, name, 45)
     if (s < 0) continue
     await click(bot, s, 0, 0)
-    const cfm = await waitFor(() => bot.currentWindow && bot.currentWindow.inventoryStart === 27, 6000)
-      ? bot.currentWindow : null
+    const cfm = await waitWindow(bot, cat.id, 27)
     if (cfm) return cfm
   }
   return null
@@ -190,7 +256,7 @@ const readPrices = () => fs.promises.readFile(PRICES, 'utf8')
 /** Rewrites daily-sell inside the DIAMOND block only. */
 async function setDiamondQuota(limit) {
   const t = await readPrices()
-  const re = /(  DIAMOND:\n(?:    [^\n]*\n)*?    daily-sell: )\d+/
+  const re = /(  DIAMOND:\r?\n(?:    [^\r\n]*\r?\n)*?    daily-sell: )\d+/
   if (!re.test(t)) throw new Error('prices.yml: DIAMOND daily-sell not found')
   await fs.promises.writeFile(PRICES, t.replace(re, '$1' + limit), 'utf8')
   await rcon('fsa reload')
@@ -227,22 +293,24 @@ async function scenario() {
   // ---- hub layout ----------------------------------------------------------
   let win = await openGui(bot, '/fmshop')
   const hubTitle = win ? titleOf(win) : ''
-  record('G1 hub opens as a 36-slot chest', !!win && win.inventoryStart === 36,
+  record('G1 hub opens as a 54-slot chest', !!win && win.inventoryStart === 54,
     `start=${win && win.inventoryStart} title=${hubTitle}`)
   record('G2 hub title is the configured shop title', /商店/.test(hubTitle), hubTitle)
   const cats = win ? HUB_CATEGORIES.filter(s => win.slots[s] && win.slots[s].name !== FILLER) : []
-  record('G3 hub shows category icons in the two category rows', cats.length >= 5, `icons=${cats.length} slots=${cats.join(',')}`)
+  record('G3 hub shows category icons in the three category rows', cats.length >= 5, `icons=${cats.length} slots=${cats.join(',')}`)
   record('G4 hub carries balance / bulk-sell / close controls',
     !!win && !!win.slots[HUB_BALANCE] && win.slots[HUB_SELL_ALL] && win.slots[HUB_SELL_ALL].name === 'chest'
     && win.slots[HUB_CLOSE] && win.slots[HUB_CLOSE].name === 'barrier',
-    win ? `29=${win.slots[HUB_BALANCE] && win.slots[HUB_BALANCE].name} 31=${win.slots[HUB_SELL_ALL] && win.slots[HUB_SELL_ALL].name} 33=${win.slots[HUB_CLOSE] && win.slots[HUB_CLOSE].name}` : 'no window')
+    win ? `47=${win.slots[HUB_BALANCE] && win.slots[HUB_BALANCE].name} 49=${win.slots[HUB_SELL_ALL] && win.slots[HUB_SELL_ALL].name} 51=${win.slots[HUB_CLOSE] && win.slots[HUB_CLOSE].name}` : 'no window')
 
   // ---- category page -------------------------------------------------------
   let diamondSlot = -1
   if (cats.length) {
+    const hubId = win.id
     await click(bot, cats[0])
-    win = await waitFor(() => bot.currentWindow && bot.currentWindow.inventoryStart === 54, 6000) ? bot.currentWindow : null
-    record('G5 category click opens a 54-slot page', !!win, `start=${bot.currentWindow && bot.currentWindow.inventoryStart}`)
+    win = await waitWindow(bot, hubId, 54)
+    record('G5 category click opens a 54-slot page', !!win,
+      `start=${bot.currentWindow && bot.currentWindow.inventoryStart} title=${bot.currentWindow ? titleOf(bot.currentWindow) : ''}`)
     if (win) {
       record('G6 category page has back arrow + page counter + balance',
         !!win.slots[CAT_BACK] && !!win.slots[CAT_PAGE] && !!win.slots[CAT_BALANCE],
@@ -258,8 +326,9 @@ async function scenario() {
     'G11 bought diamond lands in the inventory',
     'G12 balance debited exactly the quoted cost']
   if (diamondSlot >= 0) {
+    const catId = win.id
     await click(bot, diamondSlot, 0, 0)
-    win = await waitFor(() => bot.currentWindow && bot.currentWindow.inventoryStart === 27, 6000) ? bot.currentWindow : null
+    win = await waitWindow(bot, catId, 27)
     record('G8 left click opens the 27-slot confirm screen', !!win, `start=${bot.currentWindow && bot.currentWindow.inventoryStart}`)
     if (!win) {
       failGroup(BUY_GROUP, 'confirm screen unreachable')
@@ -371,9 +440,10 @@ async function scenario() {
   win = await openGui(bot, '/fmshop')
   let dumpSlot = -1
   if (win && cats.length) {
+    const hubId = win.id
     await click(bot, cats[0])
-    await waitFor(() => bot.currentWindow && bot.currentWindow.inventoryStart === 54, 6000)
-    if (bot.currentWindow) dumpSlot = slotOf(bot.currentWindow, 'diamond', 45)
+    const cat = await waitWindow(bot, hubId, 54)
+    if (cat) dumpSlot = slotOf(cat, 'diamond', 45)
   }
   if (dumpSlot < 0) {
     failGroup(DUMP_GROUP, 'diamond icon unreachable')
@@ -396,9 +466,11 @@ async function scenario() {
   await rcon(`give ${BOT} minecraft:redstone 20`)
   await waitFor(() => invCount(bot, 'coal') === 10 && invCount(bot, 'redstone') === 20, 6000)
   win = await openGui(bot, '/fmshop')
-  if (win) await click(bot, HUB_SELL_ALL, 0, 0)
-  win = win && await waitFor(() => bot.currentWindow && bot.currentWindow.inventoryStart === 54, 6000)
-    ? bot.currentWindow : null
+  if (win) {
+    const hubId = win.id
+    await click(bot, HUB_SELL_ALL, 0, 0)
+    win = await waitWindow(bot, hubId, 54)
+  }
   record('G19 bulk-sell icon opens the 一键回收 preview', !!win && /回收/.test(titleOf(win)), win ? titleOf(win) : 'no window')
   if (!win) {
     failGroup(ALL_GROUP, 'preview unreachable')
@@ -508,6 +580,193 @@ async function scenario() {
   win = await openGui(bot, '/fmshop')
   record('X2 non-op player can still shop', !!win, `start=${win && win.inventoryStart}`)
   closeGui(bot)
+
+  // ---- deep paging: 装饰 holds 221 items, five pages of 45 -----------------
+  const PAGE_GROUP = ['W1 a five-page category opens on page 1 with a full grid',
+    'W2 page 1 hides prev and offers next',
+    'W3 walking next reaches the last page',
+    'W4 last page holds only the 41 remaining items',
+    'W5 next on the last page is a no-op and prev walks back']
+  win = await openGui(bot, '/fmshop')
+  const decoSlot = win ? slotOf(win, 'white_wool', 45) : -1
+  if (decoSlot < 0) {
+    failGroup(PAGE_GROUP, 'no 装饰 icon in hub')
+  } else {
+    const hubId = win.id
+    await click(bot, decoSlot, 0, 0)
+    win = await waitWindow(bot, hubId, 54)
+    if (!win) {
+      failGroup(PAGE_GROUP, '装饰 category unreachable')
+    } else {
+      // the view re-renders in place, so always read the CURRENT window
+      const counter = () => iconName(bot.currentWindow && bot.currentWindow.slots[CAT_PAGE])
+      const filled = () => {
+        let n = 0
+        for (let s = 0; s < 45; s++) if (bot.currentWindow.slots[s]) n++
+        return n
+      }
+      record(PAGE_GROUP[0], /第 1\/5 页/.test(counter()) && filled() === 45,
+        `page="${counter()}" items=${filled()}`)
+      const prev1 = win.slots[CAT_PREV], next1 = win.slots[CAT_NEXT]
+      record(PAGE_GROUP[1], (!prev1 || prev1.name === FILLER) && !!next1 && next1.name !== FILLER,
+        `prev=${prev1 && prev1.name} next=${next1 && next1.name}`)
+      for (let i = 0; i < 4; i++) {
+        await click(bot, CAT_NEXT, 0, 0)
+        await waitFor(() => new RegExp(`第 ${i + 2}/5 页`).test(counter()), 4000)
+      }
+      record(PAGE_GROUP[2], /第 5\/5 页/.test(counter()), `page="${counter()}"`)
+      const lastPrev = bot.currentWindow.slots[CAT_PREV], lastNext = bot.currentWindow.slots[CAT_NEXT]
+      record(PAGE_GROUP[3],
+        filled() === 41 && !!lastPrev && lastPrev.name !== FILLER && (!lastNext || lastNext.name === FILLER),
+        `items=${filled()} prev=${lastPrev && lastPrev.name} next=${lastNext && lastNext.name}`)
+      await click(bot, CAT_NEXT, 0, 0)          // clamped: there is no page 6
+      const stayed = /第 5\/5 页/.test(counter())
+      await click(bot, CAT_PREV, 0, 0)
+      await waitFor(() => /第 4\/5 页/.test(counter()), 4000)
+      record(PAGE_GROUP[4], stayed && /第 4\/5 页/.test(counter()) && filled() === 45,
+        `stayed=${stayed} back="${counter()}" items=${filled()}`)
+    }
+  }
+  closeGui(bot)
+
+  // ---- enchanted books ----------------------------------------------------
+  // 128 rows share Material.ENCHANTED_BOOK; they exist at all only because a
+  // row is keyed on ItemKey and not on Material. Everything below is the part
+  // a player can see: the tab, the prices, the lock, the lifetime cap, and the
+  // exact-match rule that keeps a hand-enchanted book out of the shop.
+  const BOOK_GROUP = [
+    'E2 the 附魔 tab lists 128 enchanted books and nothing else',
+    'E3 every book row is priced, and a book costs 6x what it pays back',
+    'E4 an unsold book row renders locked and refuses to be bought',
+    'E5 an exact Sharpness V book sells for its own row price',
+    'E6 lifetime-sell stops the second book permanently',
+    'E7 selling one unlocks buying, and the bought book is a real Sharpness V',
+    'E8 a book carrying an extra enchantment matches no row',
+    'E9 /fsa price refuses to overwrite a generated book row',
+  ]
+  const SHARP5 = 'minecraft:enchanted_book[minecraft:stored_enchantments={"minecraft:sharpness":5}]'
+  const SHARP5_UNB3 =
+    'minecraft:enchanted_book[minecraft:stored_enchantments={"minecraft:sharpness":5,"minecraft:unbreaking":3}]'
+  const BUY_MUL = 6
+  const BOOK_SELL = 370.22, BOOK_BUY = '2,221.32'
+  /** Vanilla-side identity check: `clear <sel> <predicate> 0` counts, never removes. */
+  const matchingItems = async predicate => {
+    const out = await rcon(`clear ${BOT} ${predicate} 0`)
+    const m = /Found (\d+)/.exec(out)
+    return m ? parseInt(m[1], 10) : 0
+  }
+  const sellOf = it => {
+    const m = /右键卖出\s*([\d,]+\.\d\d)/.exec(loreOf(it).join('\n'))
+    return m ? num(m[1]) : NaN
+  }
+
+  await reset(BOT, 100000)
+  await rcon(`fsa resetunlock ${BOT}`)
+  win = await openGui(bot, '/fmshop')
+  const enchTab = win ? slotOf(win, 'enchanted_book', 45) : -1
+  const enchLore = enchTab >= 0 ? loreOf(win.slots[enchTab]).join(' | ') : ''
+  record('E1 hub shows an 附魔 tab carrying all 128 generated rows',
+    enchTab >= 0 && /128 种商品/.test(enchLore),
+    enchTab < 0 ? 'no enchanted_book icon among the hub categories' : `slot=${enchTab} lore=${enchLore}`)
+  if (enchTab < 0) {
+    failGroup(BOOK_GROUP, 'enchants tab unreachable')
+  } else {
+    const hubId = win.id
+    await click(bot, enchTab, 0, 0)
+    win = await waitWindow(bot, hubId, 54)
+  }
+  if (enchTab >= 0 && !win) {
+    failGroup(BOOK_GROUP, 'enchants category page never opened')
+  } else if (enchTab >= 0) {
+    const kinds = [], sells = []
+    let lockedRows = 0, cappedRows = 0
+    const pageName = () => iconName(bot.currentWindow && bot.currentWindow.slots[CAT_PAGE])
+    for (let pg = 1; pg <= 3; pg++) {
+      await waitFor(() => new RegExp(`第 ${pg}/3 页`).test(pageName()), 5000)
+      const w = bot.currentWindow
+      if (!w) break
+      for (let s = 0; s < 45; s++) {
+        const it = w.slots[s]
+        if (!it) continue
+        kinds.push(it.name)
+        sells.push(sellOf(it))
+        const lore = loreOf(it).join('\n')
+        if (/未解锁/.test(lore)) lockedRows++
+        if (/终身可卖 1/.test(lore)) cappedRows++
+      }
+      if (pg < 3) await click(bot, CAT_NEXT, 0, 0)
+    }
+    const others = [...new Set(kinds.filter(n => n !== 'enchanted_book'))]
+    record(BOOK_GROUP[0], kinds.length === 128 && others.length === 0,
+      `rows=${kinds.length} page="${pageName()}" non-book=${others.join(',') || 'none'}`)
+    const priced = sells.filter(v => v > 0).length
+    const shelf = sells.reduce((a, b) => a + (b || 0), 0)
+    closeGui(bot)
+    // The shelf total is registry-derived, so the invariant worth pinning is the
+    // spread: buy must stay buy-multiplier x sell or buy→sell prints money.
+    await chat(bot, '/fmshop price sharpness/5')
+    const priceLine = findMsg(bot, /买入/)
+    const rowBuy = num((/买入 ([\d,]+\.\d\d)/.exec(priceLine) || [])[1])
+    const rowSell = num((/卖出 ([\d,]+\.\d\d)/.exec(priceLine) || [])[1])
+    record(BOOK_GROUP[1],
+      priced === kinds.length && rowSell > 0 && Math.abs(rowBuy - rowSell * BUY_MUL) <= 0.02,
+      `priced=${priced}/${kinds.length} shelf_sell_total=${shelf.toFixed(2)} price="${priceLine || tail(bot)}"`)
+
+    await chat(bot, '/fmshop buy sharpness/5 1')
+    const lockMsg = findMsg(bot, /尚未解锁/)
+    record(BOOK_GROUP[2], lockedRows === kinds.length && cappedRows === kinds.length && !!lockMsg,
+      `locked=${lockedRows}/${kinds.length} lifetime1=${cappedRows} buy="${lockMsg || tail(bot)}"`)
+
+    // ---- sell the one book the cap allows ----------------------------------
+    await rcon(`clear ${BOT}`)
+    await rcon(`give ${BOT} ${SHARP5} 1`)
+    await waitFor(() => invCount(bot, 'enchanted_book') === 1, 6000)
+    bot.setQuickBarSlot(0)
+    await sleep(300)
+    await chat(bot, '/fmshop sell hand')
+    const sellMsg = findMsg(bot, /出售 .*×1，获得/)
+    const net = num((/获得 ([\d,]+\.\d\d)/.exec(sellMsg) || [])[1])
+    record(BOOK_GROUP[3],
+      /出售 Sharpness V ×1/.test(sellMsg) && Math.abs(net - BOOK_SELL * 0.95) <= 0.01,
+      `msg="${sellMsg || tail(bot)}" net=${net} expected≈${(BOOK_SELL * 0.95).toFixed(2)}`)
+
+    await rcon(`give ${BOT} ${SHARP5} 1`)
+    await waitFor(() => invCount(bot, 'enchanted_book') === 1, 6000)
+    bot.setQuickBarSlot(0)
+    await sleep(300)
+    await chat(bot, '/fmshop sell hand')
+    const capMsg = findMsg(bot, /终身限售/)
+    record(BOOK_GROUP[4], !!capMsg && invCount(bot, 'enchanted_book') === 1,
+      `msg="${capMsg || tail(bot)}" still_held=${invCount(bot, 'enchanted_book')}`)
+
+    // ---- the sale unlocked the row; buy it back ----------------------------
+    await rcon(`clear ${BOT}`)
+    await rcon(`fsa set ${BOT} 100000`)
+    await waitFor(() => invCount(bot, 'enchanted_book') === 0, 6000)
+    await chat(bot, '/fmshop buy sharpness/5 1')
+    const buyMsg = findMsg(bot, /购买 .*×1，支付/)
+    await waitFor(() => invCount(bot, 'enchanted_book') === 1, 6000)
+    const genuine = await matchingItems(SHARP5)
+    record(BOOK_GROUP[5],
+      buyMsg.includes(`支付 ${BOOK_BUY}`) && /购买 Sharpness V ×1/.test(buyMsg) && genuine === 1,
+      `msg="${buyMsg || tail(bot)}" vanilla_match=${genuine}`)
+
+    // ---- a book the shop never listed -------------------------------------
+    await rcon(`clear ${BOT}`)
+    await rcon(`give ${BOT} ${SHARP5_UNB3} 1`)
+    await waitFor(() => invCount(bot, 'enchanted_book') === 1, 6000)
+    bot.setQuickBarSlot(0)
+    await sleep(300)
+    await chat(bot, '/fmshop sell hand')
+    const refused = findMsg(bot, /不回收/)
+    record(BOOK_GROUP[6], !!refused && invCount(bot, 'enchanted_book') === 1,
+      `msg="${refused || tail(bot)}" still_held=${invCount(bot, 'enchanted_book')}`)
+
+    const guard = await rcon('fsa price sharpness/5 1 1')
+    record(BOOK_GROUP[7], /拒绝/.test(guard) && /enchanted-books/.test(guard), guard.trim())
+  }
+  closeGui(bot)
+  await rcon(`fsa resetunlock ${BOT}`)
 
   await sleep(300)
   if (priorDifficulty) { await rcon(`difficulty ${priorDifficulty}`); priorDifficulty = '' }

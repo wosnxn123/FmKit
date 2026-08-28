@@ -9,7 +9,7 @@ commands:
   fmshop:
     description: Open the shop menu.
     permission: fmshop.use
-    aliases: [shop, fsh]
+    aliases: [fsh]
     usage: /<command> [buy|sell [hand|inv]|price <item>|balance|pay <player> <amount>|help]
   fmshopadmin:
     description: FmShop admin commands.

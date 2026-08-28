@@ -3,6 +3,7 @@ package dev.fm.shop.store;
 import dev.fm.shop.util.Money;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -13,28 +14,37 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The price table, parsed from config.yml.
+ * The price table, parsed from prices.yml.
  *
- * <p>Rows are keyed by {@link Material} name, and unknown names are collected
- * instead of aborting the load: a config written for 1.21.x can name materials
- * that a later drop renamed or removed (and 26.2 adds SULFUR/CINNABAR families
- * that older servers lack). {@code /fsa doctor} lists them so the operator can
- * fix the file, while every valid row keeps working.
+ * <p>Rows are keyed by {@link PriceEntry#id()} rather than by {@link Material},
+ * because one material can back many rows: every enchanted book is
+ * {@code ENCHANTED_BOOK}. A material-to-rows index is kept alongside so an
+ * inventory stack can be resolved back to its row in one step - see
+ * {@link #match(ItemStack)}.
+ *
+ * <p>Unknown material names are collected instead of aborting the load: a config
+ * written for 1.21.x can name materials that a later drop renamed or removed
+ * (and 26.2 adds SULFUR/CINNABAR families that older servers lack).
+ * {@code /fsa doctor} lists them so the operator can fix the file, while every
+ * valid row keeps working.
  */
 public final class PriceCatalog {
 
-    private final Map<Material, PriceEntry> entries = new EnumMap<>(Material.class);
-    private final Map<String, List<Material>> byCategory = new LinkedHashMap<>();
+    private final Map<String, PriceEntry> entries = new LinkedHashMap<>();
+    /** Reverse index for resolving a held stack; most lists hold one row. */
+    private final Map<Material, List<PriceEntry>> byMaterial = new EnumMap<>(Material.class);
+    private final Map<String, List<String>> byCategory = new LinkedHashMap<>();
     private final List<Category> categories = new ArrayList<>();
     private final List<String> unknown = new ArrayList<>();
     private final List<String> problems = new ArrayList<>();
 
     /** Defaults applied to rows that omit the dynamic-pricing block. */
-    private record Dyn(boolean on, int stepBp, int floorBp, int ceilBp, int recoverBpPerHour) {
+    record Dyn(boolean on, int stepBp, int floorBp, int ceilBp, int recoverBpPerHour) {
     }
 
     public void load(ConfigurationSection root) {
         entries.clear();
+        byMaterial.clear();
         byCategory.clear();
         categories.clear();
         unknown.clear();
@@ -46,6 +56,10 @@ public final class PriceCatalog {
                 new Dyn(false, 25, 5_000, 20_000, 500));
         loadCategories(root.getConfigurationSection("categories"));
         loadItems(root.getConfigurationSection("items"), def);
+        for (PriceEntry e : EnchantedBooks.expand(
+                root.getConfigurationSection("enchanted-books"), def, problems)) {
+            add(e);
+        }
         categories.sort(Comparator.comparingInt(Category::order));
         for (Category c : categories) {
             byCategory.computeIfAbsent(c.id(), k -> new ArrayList<>());
@@ -102,13 +116,34 @@ public final class PriceCatalog {
             }
             String cat = row.getString("category", "misc").toLowerCase(Locale.ROOT);
             Dyn d = readDyn(row.getConfigurationSection("dynamic"), def);
-            PriceEntry e = new PriceEntry(mat, cat, buy, sell,
+            boolean unlock = row.getBoolean("unlock-by-sell", false);
+            int lifetime = Math.max(0, row.getInt("lifetime-sell", 0));
+            if (unlock && sell == 0) {
+                problems.add(key + " 设了 unlock-by-sell 但不回收，将永远无法解锁");
+            }
+            if (unlock && buy == 0) {
+                problems.add(key + " 设了 unlock-by-sell 但不出售，解锁没有意义");
+            }
+            if (lifetime > 0 && sell == 0) {
+                problems.add(key + " 设了 lifetime-sell 但不回收，该上限不会生效");
+            }
+            add(new PriceEntry(ItemKey.of(mat), cat, buy, sell,
                     Math.max(0, row.getInt("daily-buy", 0)),
                     Math.max(0, row.getInt("daily-sell", 0)),
-                    d.on(), d.stepBp(), d.floorBp(), d.ceilBp(), d.recoverBpPerHour());
-            entries.put(mat, e);
-            byCategory.computeIfAbsent(cat, k -> new ArrayList<>()).add(mat);
+                    unlock, lifetime,
+                    d.on(), d.stepBp(), d.floorBp(), d.ceilBp(), d.recoverBpPerHour()));
         }
+    }
+
+    /** Registers a row in the id table, the material index and its category. */
+    private void add(PriceEntry e) {
+        String id = e.id();
+        if (entries.putIfAbsent(id, e) != null) {
+            problems.add("重复的商品 " + id + "，后一条已忽略");
+            return;
+        }
+        byMaterial.computeIfAbsent(e.material(), k -> new ArrayList<>(1)).add(e);
+        byCategory.computeIfAbsent(e.category(), k -> new ArrayList<>()).add(id);
     }
 
     private long cents(ConfigurationSection row, String path, String key) {
@@ -123,7 +158,7 @@ public final class PriceCatalog {
         return v;
     }
 
-    private Dyn readDyn(ConfigurationSection sec, Dyn def) {
+    static Dyn readDyn(ConfigurationSection sec, Dyn def) {
         if (sec == null) {
             return def;
         }
@@ -142,21 +177,56 @@ public final class PriceCatalog {
                 Math.max(0, sec.getInt("recover-bp-per-hour", def.recoverBpPerHour())));
     }
 
-    public PriceEntry get(Material mat) {
-        return entries.get(mat);
+    public PriceEntry get(String id) {
+        return id == null ? null : entries.get(id);
     }
 
-    public boolean has(Material mat) {
-        return entries.containsKey(mat);
+    /** The bare-material row for {@code mat}, ignoring any variant rows. */
+    public PriceEntry plain(Material mat) {
+        return mat == null ? null : entries.get(mat.name());
+    }
+
+    /**
+     * The row that {@code stack} trades as, or null if the shop does not deal in
+     * it. At most one row can match: {@link ItemKey#matches} is exact, so a
+     * plain row and a variant row of the same material never both accept the
+     * same stack.
+     */
+    public PriceEntry match(ItemStack stack) {
+        if (stack == null) {
+            return null;
+        }
+        List<PriceEntry> rows = byMaterial.get(stack.getType());
+        if (rows == null) {
+            return null;
+        }
+        for (PriceEntry e : rows) {
+            if (e.key().matches(stack)) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    public boolean has(String id) {
+        return entries.containsKey(id);
     }
 
     /** Pulls a row out of the live table (strict-mode doctor enforcement). */
-    public boolean remove(Material mat) {
-        if (entries.remove(mat) == null) {
+    public boolean remove(String id) {
+        PriceEntry gone = entries.remove(id);
+        if (gone == null) {
             return false;
         }
-        for (List<Material> list : byCategory.values()) {
-            list.remove(mat);
+        List<PriceEntry> rows = byMaterial.get(gone.material());
+        if (rows != null) {
+            rows.remove(gone);
+            if (rows.isEmpty()) {
+                byMaterial.remove(gone.material());
+            }
+        }
+        for (List<String> list : byCategory.values()) {
+            list.remove(id);
         }
         return true;
     }
@@ -169,8 +239,8 @@ public final class PriceCatalog {
         return categories;
     }
 
-    /** Materials of one tab, in config order. */
-    public List<Material> items(String categoryId) {
+    /** Row ids of one tab, in config order. */
+    public List<String> items(String categoryId) {
         return byCategory.getOrDefault(categoryId, List.of());
     }
 
@@ -189,36 +259,45 @@ public final class PriceCatalog {
     }
 
     /**
-     * Resolves user input to a priced material: exact id, then unique prefix of
-     * the material name, so {@code /fmshop price sulfur_sp} finds SULFUR_SPIKE.
+     * Resolves free-text command input to a row: exact id (case-insensitive),
+     * then the plain row of a named material, then a unique prefix or substring
+     * of an id. So {@code /fmshop price sulfur_sp} finds SULFUR_SPIKE and
+     * {@code /fmshop price sharpness/5} finds the Sharpness V book, while a
+     * bare {@code sharpness} is ambiguous across five levels and resolves to
+     * nothing rather than to an arbitrary one.
      */
-    public Material match(String input) {
+    public PriceEntry match(String input) {
         if (input == null || input.isBlank()) {
             return null;
         }
-        Material exact = Material.matchMaterial(input.trim());
-        if (exact != null && entries.containsKey(exact)) {
-            return exact;
-        }
         String needle = input.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
-        Material hit = null;
-        for (Material m : entries.keySet()) {
-            if (m.name().startsWith(needle)) {
-                if (hit != null) {
-                    return null;
-                }
-                hit = m;
-            }
-        }
+        PriceEntry hit = entries.get(needle);
         if (hit != null) {
             return hit;
         }
-        for (Material m : entries.keySet()) {
-            if (m.name().contains(needle)) {
+        Material exact = Material.matchMaterial(input.trim());
+        if (exact != null) {
+            hit = entries.get(exact.name());
+            if (hit != null) {
+                return hit;
+            }
+        }
+        String id = unique(needle, true);
+        if (id == null) {
+            id = unique(needle, false);
+        }
+        return id == null ? null : entries.get(id);
+    }
+
+    /** The single id starting with (or containing) {@code needle}, else null. */
+    private String unique(String needle, boolean prefix) {
+        String hit = null;
+        for (String id : entries.keySet()) {
+            if (prefix ? id.startsWith(needle) : id.contains(needle)) {
                 if (hit != null) {
                     return null;
                 }
-                hit = m;
+                hit = id;
             }
         }
         return hit;

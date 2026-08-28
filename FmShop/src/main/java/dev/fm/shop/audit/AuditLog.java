@@ -1,11 +1,10 @@
 package dev.fm.shop.audit;
 
 import dev.fm.shop.FmShopPlugin;
-import dev.fm.shop.util.ItemNames;
+import dev.fm.shop.store.ItemKey;
 import dev.fm.shop.util.Money;
 import dev.fm.shop.util.TextUtil;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 import java.io.IOException;
@@ -29,7 +28,7 @@ import java.util.function.Consumer;
  * Append-only transaction log under plugins/FmShop/audit/&lt;date&gt;.log.
  *
  * <p>Line format is fixed-field and tab-free so it stays greppable:
- * {@code 12:04:31 BUY Steve iron_ingot x64 gross=384.00 fee=0.00 net=384.00 bal=1216.00}
+ * {@code 12:04:31 BUY Steve IRON_INGOT x64 gross=384.00 fee=0.00 net=384.00 bal=1216.00}
  *
  * <p>Writes are queued to a single daemon thread; the admin alert for large
  * trades is dispatched on the calling thread, where the player list is already
@@ -55,11 +54,11 @@ public final class AuditLog {
 
     /**
      * @param kind  BUY / SELL / PAY / ADMIN
-     * @param mat   traded material, null for money-only events
+     * @param key   traded row key, null for money-only events
      * @param gross value before fees, in cents
      * @param net   balance delta actually applied, in cents
      */
-    public void log(Player who, String kind, Material mat, int qty,
+    public void log(Player who, String kind, ItemKey key, int qty,
                     long gross, long fee, long net, long balanceAfter) {
         if (!plugin.settings().auditEnabled()) {
             return;
@@ -67,13 +66,13 @@ public final class AuditLog {
         String line = LocalDateTime.now().format(TIME)
                 + " " + kind
                 + " " + who.getName()
-                + " " + (mat == null ? "-" : ItemNames.plain(mat).replace(' ', '_'))
+                + " " + (key == null ? "-" : key.id())
                 + " x" + qty
                 + " gross=" + Money.format(gross)
                 + " fee=" + Money.format(fee)
                 + " net=" + Money.format(net)
                 + " bal=" + Money.format(balanceAfter);
-        alert(who, kind, mat, qty, net);
+        alert(who, kind, key, qty, net);
         append(line);
     }
 
@@ -92,12 +91,12 @@ public final class AuditLog {
                 + " by=" + actor);
     }
 
-    private void alert(Player who, String kind, Material mat, int qty, long net) {
+    private void alert(Player who, String kind, ItemKey key, int qty, long net) {
         long threshold = plugin.settings().auditAlertAbove();
         if (threshold <= 0 || Math.abs(net) < threshold) {
             return;
         }
-        String item = mat == null ? "" : " " + ItemNames.mini(mat) + " ×" + qty;
+        String item = key == null ? "" : " " + key.plainName() + " ×" + qty;
         String msg = "<gray>[<gold>审计</gold>]</gray> <white>" + who.getName() + "</white> "
                 + kind + item + " <yellow>" + Money.format(net, plugin.settings().currency()) + "</yellow>";
         for (Player p : Bukkit.getOnlinePlayers()) {

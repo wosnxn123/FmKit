@@ -2,10 +2,10 @@ package dev.fm.shop.cmd;
 
 import dev.fm.shop.FmShopPlugin;
 import dev.fm.shop.Settings;
+import dev.fm.shop.store.ItemKey;
 import dev.fm.shop.store.PlayerData;
 import dev.fm.shop.store.PriceDoctor;
 import dev.fm.shop.store.PriceEntry;
-import dev.fm.shop.util.ItemNames;
 import dev.fm.shop.util.Money;
 import dev.fm.shop.util.TextUtil;
 import dev.fm.shop.util.TimeUtil;
@@ -39,7 +39,7 @@ import java.util.UUID;
 public final class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
-            "give", "take", "set", "price", "market", "resetlimit",
+            "give", "take", "set", "price", "market", "resetlimit", "resetunlock",
             "reload", "status", "audit", "doctor", "tax", "help");
 
     private final FmShopPlugin plugin;
@@ -59,6 +59,7 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
             case "price" -> price(sender, args);
             case "market" -> market(sender, args);
             case "resetlimit" -> resetLimit(sender, args);
+            case "resetunlock" -> resetUnlock(sender, args);
             case "reload" -> reload(sender);
             case "status" -> status(sender);
             case "audit" -> audit(sender, args);
@@ -75,6 +76,7 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
         TextUtil.send(sender, "<yellow>/" + label + " price <物品> <买入> <卖出> <gray>写入 prices.yml 并重载");
         TextUtil.send(sender, "<yellow>/" + label + " market <物品> [reset] <gray>查看/重置行情");
         TextUtil.send(sender, "<yellow>/" + label + " resetlimit <玩家|*> <gray>清除今日限额");
+        TextUtil.send(sender, "<yellow>/" + label + " resetunlock <玩家> <gray>清除终身计数（重新上锁）");
         TextUtil.send(sender, "<yellow>/" + label + " tax [take <玩家> <金额>] <gray>公共税池");
         TextUtil.send(sender, "<yellow>/" + label + " audit [玩家] [条数] <gray>查看交易记录");
         TextUtil.send(sender, "<yellow>/" + label + " doctor <gray>价格表体检");
@@ -142,10 +144,16 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
             TextUtil.send(sender, "<red>用法：/fsa price <物品> <买入> <卖出>（0 = 不交易）");
             return;
         }
-        Material mat = plugin.prices().match(args[1]);
-        if (mat == null) {
-            mat = Material.matchMaterial(args[1]);
+        PriceEntry e = plugin.prices().match(args[1]);
+        if (e != null && !e.key().plain()) {
+            // Generated book rows live under enchanted-books, not items.* -
+            // writing items.ENCHANTED_BOOK would shadow them with a plain row.
+            TextUtil.send(sender, "<red>拒绝：该附魔书商品由 enchanted-books 配置块生成，请在 prices.yml 的 enchanted-books 区段中改价");
+            return;
         }
+        // match(String) only resolves rows already in the catalog; the fallback
+        // stays so a not-yet-listed plain material can still gain its first row.
+        Material mat = e != null ? e.material() : Material.matchMaterial(args[1]);
         if (mat == null || !mat.isItem()) {
             TextUtil.send(sender, prefix() + TextUtil.apply(plugin.settings().msg("unknown-item"),
                     "input", args[1]));
@@ -171,7 +179,7 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
             return;
         }
         String path = "items." + mat.name();
-        PriceEntry old = plugin.prices().get(mat);
+        PriceEntry old = plugin.prices().plain(mat);
         y.set(path + ".buy", buy / (double) Money.SCALE);
         y.set(path + ".sell", sell / (double) Money.SCALE);
         if (!y.isSet(path + ".category")) {
@@ -185,7 +193,7 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
         }
         plugin.reload();
         TextUtil.send(sender, prefix() + TextUtil.apply(plugin.settings().msg("admin-price"),
-                "item", ItemNames.mini(mat), "buy", money(buy), "sell", money(sell)));
+                "item", e != null ? e.key().mini() : ItemKey.of(mat).mini(), "buy", money(buy), "sell", money(sell)));
         plugin.audit().logAdmin(sender.getName(), mat.name(), "PRICE", buy, sell);
     }
 
@@ -196,29 +204,28 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
             TextUtil.send(sender, "<red>用法：/fsa market <物品> [reset]");
             return;
         }
-        Material mat = plugin.prices().match(args[1]);
-        PriceEntry e = mat == null ? null : plugin.prices().get(mat);
+        PriceEntry e = plugin.prices().match(args[1]);
         if (e == null) {
             TextUtil.send(sender, prefix() + TextUtil.apply(plugin.settings().msg("unknown-item"),
                     "input", args[1]));
             return;
         }
         if (args.length >= 3 && args[2].equalsIgnoreCase("reset")) {
-            plugin.market().reset(e.material());
+            plugin.market().reset(e.id());
             TextUtil.send(sender, prefix() + TextUtil.apply(plugin.settings().msg("admin-market-reset"),
-                    "item", ItemNames.mini(e.material())));
-            plugin.audit().logAdmin(sender.getName(), e.material().name(), "MARKET-RESET", 0, 0);
+                    "item", e.key().mini()));
+            plugin.audit().logAdmin(sender.getName(), e.id(), "MARKET-RESET", 0, 0);
             return;
         }
         long now = System.currentTimeMillis();
-        TextUtil.send(sender, prefix() + ItemNames.mini(e.material())
+        TextUtil.send(sender, prefix() + e.key().mini()
                 + " <gray>行情 <white>" + Math.round(plugin.market().multiplierBp(e, now) / 100f) + "%");
         TextUtil.send(sender, "<gray>现价 买入 <white>" + money(plugin.market().buyUnit(e, now))
                 + "</white> 卖出 <white>" + money(plugin.market().sellUnit(e, now)));
         TextUtil.send(sender, "<gray>基准 买入 <white>" + money(e.buy())
                 + "</white> 卖出 <white>" + money(e.sell())
-                + "</white>，累计买 <white>" + plugin.market().bought(e.material())
-                + "</white> 卖 <white>" + plugin.market().sold(e.material()));
+                + "</white>，累计买 <white>" + plugin.market().bought(e.id())
+                + "</white> 卖 <white>" + plugin.market().sold(e.id()));
     }
 
     // ---------------------------------------------------------- quota reset
@@ -252,6 +259,35 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
         TextUtil.send(sender, prefix() + TextUtil.apply(plugin.settings().msg("admin-reset-limit"),
                 "player", String.valueOf(target.getName())));
         plugin.audit().logAdmin(sender.getName(), String.valueOf(target.getName()), "RESETLIMIT", 0,
+                d.balance());
+    }
+
+    /**
+     * Clears one player's lifetime sell ledger: every unlock-gated row goes back
+     * to locked and every lifetime cap is refunded.
+     *
+     * <p>Single-player only, deliberately. There is no {@code *} form because
+     * wiping progress server-wide is not a routine correction, and the online-only
+     * sweep {@code resetlimit} uses would silently miss offline players - leaving
+     * the ledger inconsistent in a way that is invisible until someone logs in.
+     */
+    private void resetUnlock(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            TextUtil.send(sender, "<red>用法：/fsa resetunlock <玩家>");
+            return;
+        }
+        OfflinePlayer target = lookup(args[1]);
+        if (target == null) {
+            TextUtil.send(sender, prefix() + TextUtil.apply(plugin.settings().msg("player-not-found"),
+                    "player", args[1]));
+            return;
+        }
+        PlayerData d = plugin.data().loadSync(target.getUniqueId());
+        d.resetLifetime();
+        plugin.data().save(target.getUniqueId(), d);
+        TextUtil.send(sender, prefix() + TextUtil.apply(plugin.settings().msg("admin-reset-unlock"),
+                "player", String.valueOf(target.getName())));
+        plugin.audit().logAdmin(sender.getName(), String.valueOf(target.getName()), "RESETUNLOCK", 0,
                 d.balance());
     }
 
@@ -412,7 +448,7 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2) {
             return switch (sub) {
-                case "give", "take", "set", "audit" -> prefixed(names(), args[1]);
+                case "give", "take", "set", "audit", "resetunlock" -> prefixed(names(), args[1]);
                 case "resetlimit" -> {
                     List<String> opts = new ArrayList<>(names());
                     opts.add(0, "*");
@@ -437,7 +473,7 @@ public final class AdminCommand implements CommandExecutor, TabCompleter {
     private List<String> itemIds() {
         List<String> ids = new ArrayList<>(plugin.prices().size());
         for (PriceEntry e : plugin.prices().all()) {
-            ids.add(e.material().name().toLowerCase(Locale.ROOT));
+            ids.add(e.id().toLowerCase(Locale.ROOT));
         }
         return ids;
     }

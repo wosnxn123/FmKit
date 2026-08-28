@@ -29,6 +29,16 @@ public final class TextUtil {
         return MM.deserialize(s == null ? "" : s);
     }
 
+    /**
+     * Component -> MiniMessage source, so a name the server API hands us as a
+     * {@link Component} can be embedded in a message template that is still a
+     * String. Literal text is escaped, so an API-supplied name containing
+     * {@code <} cannot inject tags when the template is deserialised again.
+     */
+    public static String serialize(Component c) {
+        return MM.serialize(c);
+    }
+
     /** MiniMessage source -> legacy section string. */
     public static String legacy(String s) {
         return LEGACY.serialize(mini(s));

@@ -1,13 +1,15 @@
 # ---- 构建产物 ----
 target/
-FmKit/target/
 *.class
 
 # ---- Node（测试套件） ----
 bot/node_modules/
 
-# ---- 本地测试服务端（世界数据/服务端二进制，不随源码发布） ----
+# ---- 本地测试服务端（服务端二进制/世界数据/依赖缓存，不随源码发布） ----
 servers/
+libraries/
+versions/
+logs/
 
 # ---- 独立项目，不属于本仓库 ----
 FmTerm/

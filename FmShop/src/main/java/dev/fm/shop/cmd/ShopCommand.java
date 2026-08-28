@@ -1,16 +1,15 @@
 package dev.fm.shop.cmd;
 
 import dev.fm.shop.FmShopPlugin;
+import dev.fm.shop.store.ItemKey;
 import dev.fm.shop.store.MarketState;
 import dev.fm.shop.store.PriceEntry;
 import dev.fm.shop.tx.TxReport;
 import dev.fm.shop.tx.TxResult;
-import dev.fm.shop.util.ItemNames;
 import dev.fm.shop.util.Money;
 import dev.fm.shop.util.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
-import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -117,7 +116,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         long now = System.currentTimeMillis();
         TextUtil.send(sender, plugin.settings().msg("prefix")
                 + TextUtil.apply(plugin.settings().msg("price-line"),
-                "item", ItemNames.mini(e.material()),
+                "item", e.key().mini(),
                 "buy", e.buyable() ? money(plugin.market().buyUnit(e, now)) : "-",
                 "sell", e.sellable() ? money(plugin.market().sellUnit(e, now)) : "-"));
         if (e.dynamic()) {
@@ -143,7 +142,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             return;
         }
         TxResult r = plugin.tx().buy(p, e, qty(args, 2));
-        TxReport.tell(plugin, p, e.material(), r);
+        TxReport.tell(plugin, p, e.key(), r);
     }
 
     private void sell(CommandSender sender, String[] args) {
@@ -172,15 +171,15 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
                 TextUtil.send(sender, plugin.settings().prefixed("hand-empty"));
                 return;
             }
-            PriceEntry e = plugin.prices().get(hand.getType());
+            PriceEntry e = plugin.prices().match(hand);
             if (e == null || !e.sellable()) {
                 TextUtil.send(sender, plugin.settings().msg("prefix")
                         + TextUtil.apply(plugin.settings().msg("not-sellable"),
-                        "item", ItemNames.mini(hand.getType())));
+                        "item", ItemKey.of(hand.getType()).mini()));
                 return;
             }
             TxResult r = plugin.tx().sell(p, e, hand.getAmount());
-            TxReport.tell(plugin, p, e.material(), r);
+            TxReport.tell(plugin, p, e.key(), r);
             return;
         }
         PriceEntry e = resolve(sender, args[1]);
@@ -188,7 +187,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             return;
         }
         TxResult r = plugin.tx().sell(p, e, qty(args, 2));
-        TxReport.tell(plugin, p, e.material(), r);
+        TxReport.tell(plugin, p, e.key(), r);
     }
 
     private void pay(CommandSender sender, String[] args) {
@@ -253,8 +252,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
 
     /** Resolves user input to a priced item, reporting the failure itself. */
     private PriceEntry resolve(CommandSender sender, String input) {
-        Material mat = plugin.prices().match(input);
-        PriceEntry e = mat == null ? null : plugin.prices().get(mat);
+        PriceEntry e = plugin.prices().match(input);
         if (e == null) {
             TextUtil.send(sender, plugin.settings().msg("prefix")
                     + TextUtil.apply(plugin.settings().msg("unknown-item"), "input", input));
@@ -314,7 +312,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
     private List<String> itemIds() {
         List<String> ids = new ArrayList<>(plugin.prices().size());
         for (PriceEntry e : plugin.prices().all()) {
-            ids.add(e.material().name().toLowerCase(Locale.ROOT));
+            ids.add(e.id().toLowerCase(Locale.ROOT));
         }
         return ids;
     }

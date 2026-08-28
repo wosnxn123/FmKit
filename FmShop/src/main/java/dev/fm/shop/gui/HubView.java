@@ -14,19 +14,22 @@ import java.util.List;
 /**
  * Shop landing screen: one icon per category, plus balance and bulk sell.
  *
- * <p>Categories occupy two rows so a table can grow to fourteen without paging
- * the hub itself. Empty categories are hidden - an icon that opens nothing is
- * worse than no icon.
+ * <p>Categories occupy three interior rows so a table can grow to twenty-one
+ * without paging the hub itself - the enchants tab alone adds several book
+ * rows. Empty categories are hidden - an icon that opens nothing is worse than
+ * no icon.
  */
 public final class HubView extends View {
 
+    /** Category icons, row by row; the bottom row is reserved for the footer. */
     private static final int[] CATEGORY_SLOTS = {
             10, 11, 12, 13, 14, 15, 16,
             19, 20, 21, 22, 23, 24, 25,
+            28, 29, 30, 31, 32, 33, 34,
     };
-    private static final int SLOT_BALANCE = 29;
-    private static final int SLOT_SELL_ALL = 31;
-    private static final int SLOT_CLOSE = 33;
+    private static final int SLOT_BALANCE = 47;
+    private static final int SLOT_SELL_ALL = 49;
+    private static final int SLOT_CLOSE = 51;
 
     private final List<Category> shown = new ArrayList<>();
 
@@ -41,7 +44,7 @@ public final class HubView extends View {
 
     @Override
     protected int size() {
-        return 36;
+        return 54;
     }
 
     @Override

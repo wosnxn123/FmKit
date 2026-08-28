@@ -33,7 +33,7 @@ public final class CategoryView extends View {
 
     private final String categoryId;
     private int page;
-    private final List<Material> items = new ArrayList<>();
+    private final List<String> items = new ArrayList<>();
 
     public CategoryView(FmShopPlugin plugin, Player player, String categoryId, int page) {
         super(plugin, player);
@@ -131,6 +131,11 @@ public final class CategoryView extends View {
             return;
         }
         boolean buying = !type.isRightClick();
+        if (buying && Gui.locked(plugin, e, player)) {
+            Gui.deny(plugin, player);
+            TxReport.tell(plugin, player, e.key(), TxResult.fail("locked"));
+            return;
+        }
         if (buying ? !e.buyable() : !e.sellable()) {
             Gui.deny(plugin, player);
             return;
@@ -139,7 +144,7 @@ public final class CategoryView extends View {
             // Dump everything held of this item; the engine clamps to quota,
             // stock on hand, and max-per-action.
             TxResult r = plugin.tx().sell(player, e, plugin.settings().maxPerAction());
-            TxReport.tell(plugin, player, e.material(), r);
+            TxReport.tell(plugin, player, e.key(), r);
             render();
             return;
         }

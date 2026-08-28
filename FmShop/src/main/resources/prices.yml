@@ -1,22 +1,42 @@
 # ===========================================================================
-#  FmShop 价格表
+#  FmShop 价格表 —— 全物品表（1374 件，15 个分类）
+#  另有 128 本附魔书由文件末尾附近的 enchanted-books 区段按曲线展开，不逐条写在 items: 里
 #
 #  buy  = 玩家买入价（每个），0 或缺省 = 不出售
 #  sell = 玩家卖出价（每个），0 或缺省 = 不回收
 #
-#  【核心不变量】全表遵守 buy = 2 × sell。
-#  这个 100% 的买卖差价是反套利的根基：任何合成配方的产物价值不会超过
-#  材料价值之和，而材料买入价已是其卖出价的两倍，所以“买材料 → 合成 → 卖产物”
-#  永远亏损。方块类（9 合 1）按 9 倍精确定价，熔炼类保证“产物卖价 ≤ 原料买价”。
-#  /fsa doctor 会用服务器真实配方表复核全部组合，改价后请务必运行一次。
+#  【核心不变量】全表 buy = 2 × sell（个别注明的例外只会更保守）。
 #
-#  【定价梯度】按“获取难度 / 可自动化程度”分档，而非按稀有度：
-#    刷怪塔、铁傀儡农场、作物农场等可无限自动化产出的物品定价极低；
-#    受时运影响的矿物已按时运 III 的期望产量（约 2.2 倍）折算；
-#    无法量产的（下界之星、鞘壳、鞘翅）价格高，部分只卖不收作为金币回收口。
+#  【价格怎么来的】非天然物品的买价由服务器真实配方递推：
+#     buy(产物) = 1.25 × min(配方里每个格子最便宜合法材料的买价之和) / 产量
+#  回收率 50% 加 25% 加工费，意味着“买材料 → 合成 → 卖产物”恒定亏损
+#  （0.5 × 1.25 = 0.625 < 1），且这条性质对任意深度的合成链都成立。
+#  天然产出（矿石、花草、树叶、怪物掉落、结构战利品）无法递推，逐条手工定锚。
+#
+#  【三类 doctor 看不见的漏洞，已单独处理】
+#   1. 时运挖矿：所有 *_ORE 与硫磺尖刺 buy: 0（只回收不出售），
+#      玩家无法“买矿石 + 时运镐”把 1 份矿变成 4 份掉落。
+#   2. 破方块掉落：沙砾→燧石、萤石→萤石粉、紫水晶簇→碎片、海晶灯→水晶、
+#      西瓜→瓜片、书架→书、雪块→雪球、粘土→粘土球、树脂块→树脂，
+#      逐个校验“方块买价 ≥ 时运 III 上限掉落的卖价”。
+#   3. 熔炉/切石机：与合成同样纳入 /fsa doctor 的配方复核。
+#
+#  改价后必须跑 /fsa doctor：它用服务器自己的配方表复核每条卖出价。
+#  当前状态：ERROR 0，WARN 37（全部是“原料是只回收的矿石，商店不出售”）。
 #
 #  daily-buy / daily-sell = 每名玩家每日限额（件），0 = 不限
 #  dynamic.enabled        = 该商品价格随交易量浮动（买入推高、卖出压低）
+#
+#  【玩法保护:解锁与终身限售】
+#  unlock-by-sell: true  该商品对某玩家上锁,直到他向商店卖出过 1 个;
+#                        之后永久解锁购买。目的是保住"自己搞到它"这段玩法
+#                        (末地城打潜影贝、召唤凋灵、下远古城)不被商店抹掉,
+#                        同时不剥夺之后的便利性购买。要求 sell > 0。
+#  lifetime-sell: N      每名玩家终身最多卖出 N 个,永不重置(区别于 daily-sell)。
+#                        用于可再生的农场产物:允许兑现一次,不允许当印钞机。
+#  两者共用同一份终身计数(存档 sold-ever 段),只对声明了它们的行写盘。
+#  注意:给某行后加 unlock-by-sell 会让所有老玩家重新上锁(他们过去的卖出
+#  没有被记录);管理员可用 /fsa resetunlock <玩家> 清除某人的终身计数。
 # ===========================================================================
 
 dynamic-defaults:
@@ -33,99 +53,121 @@ categories:
     name: "<gold>矿物</gold>"
     icon: IRON_INGOT
     order: 1
-  blocks:
-    name: "<gray>建材</gray>"
+  stone:
+    name: "<gray>石材</gray>"
     icon: STONE
     order: 2
-  farm:
-    name: "<green>农牧</green>"
-    icon: WHEAT
+  wood:
+    name: "<dark_green>木材</dark_green>"
+    icon: OAK_LOG
     order: 3
+  nature:
+    name: "<green>自然</green>"
+    icon: OAK_SAPLING
+    order: 4
+  farm:
+    name: "<yellow>农牧</yellow>"
+    icon: WHEAT
+    order: 5
   food:
     name: "<red>食物</red>"
     icon: COOKED_BEEF
-    order: 4
+    order: 6
   mob:
     name: "<dark_purple>战利品</dark_purple>"
     icon: ENDER_PEARL
-    order: 5
+    order: 7
   nether:
     name: "<dark_red>下界</dark_red>"
     icon: NETHERRACK
-    order: 6
+    order: 8
+  end:
+    name: "<light_purple>末地</light_purple>"
+    icon: END_STONE
+    order: 9
+  redstone:
+    name: "<dark_red>红石</dark_red>"
+    icon: REDSTONE
+    order: 10
+  deco:
+    name: "<aqua>装饰</aqua>"
+    icon: WHITE_WOOL
+    order: 11
+  gear:
+    name: "<blue>装备</blue>"
+    icon: DIAMOND_SWORD
+    order: 12
+  brew:
+    name: "<dark_aqua>酿造</dark_aqua>"
+    icon: BREWING_STAND
+    order: 13
   misc:
-    name: "<aqua>杂项</aqua>"
+    name: "<white>杂项</white>"
     icon: NAME_TAG
-    order: 7
+    order: 14
+  enchants:
+    name: "<light_purple>附魔</light_purple>"
+    icon: ENCHANTED_BOOK
+    order: 15
+
+# ===========================================================================
+#  附魔书 —— 128 行（43 种附魔 × 各自等级）由本区段展开，不在 items: 表里手写
+#
+#  为什么不手写：128 行手写必然互相矛盾，而且游戏加一个附魔（26.2 加了 lunge）
+#  表里就静静缺一行，没人会发现。所以价格来自曲线，曲线里的稀有度取原版自己的数据：
+#
+#     sell = base-sell × 等级^level-exponent × rarity^rarity-exponent × 诅咒系数
+#     buy  = sell × buy-multiplier
+#
+#  rarity 默认取原版的 Enchantment#getAnvilCost()（1 / 2 / 4 / 8）：它本来就是
+#  “价值倍率”，正好是 getWeight()（10 / 5 / 2 / 1）的倒数，也是 API 里唯一
+#  表达“更值钱”而不只是“更少见”的量。只靠等级的曲线在这三个上会错得很离谱：
+#  精准采集、无限、引雷都是最高一级且非宝藏，等级曲线把它们标成锋利 I 的价，
+#  而原版给这三个 anvil 8。
+#
+#  下面 overrides 里的 rarity 是“原版稀有度和玩家实际需求不一致”的地方。
+#  改 rarity 而不是直接写死 sell，是为了保住该附魔的等级曲线（写死 sell 会把
+#  I..V 全压成一个价）。overrides 也接受 SHARPNESS/5 这种只改单个等级的写法，
+#  以及 buy / sell / daily-buy / daily-sell / lifetime-sell / unlock-by-sell / max-level。
+#
+#  展开结果：128 行，全表 sell 合计 31040（= 每名玩家终身能从附魔书套现的上限）。
+#  最贵：灵魂疾行 III / 迅捷潜行 III 买 7457（只出自远古城，商店买不到替代品）、
+#  致密 IV 6080、穿透 V 4443、经验修补 I 3600、锋利 V 2221。
+# ===========================================================================
+enchanted-books:
+  enabled: true
+  category: enchants
+  base-sell: 24
+  level-exponent: 1.7
+  rarity-exponent: 1
+  buy-multiplier: 6
+  # 诅咒也上架（不留空洞，免得看起来像 bug），但只值四分之一
+  curse-multiplier: 0.25
+
+  # 终身限售 1 本，必须保留：治好的僵尸村民图书管理员能用 1 颗绿宝石换一本
+  # 可交易附魔书（原版 tradeable 标签，含经验修补）。不限售就是无上限刷钱。
+  lifetime-sell: 1
+  # 与上一行配合：卖出 1 本后该行永久解锁购买 —— 一次性套现，之后随便买。
+  # 目的是保住“自己附魔 / 自己找村民换”这段玩法不被商店抹掉。
+  unlock-by-sell: true
+
+  overrides:
+    # 经验修补：原版 anvil 只有 4，但它是唯一不可再生、且人人都要的附魔
+    MENDING:            { rarity: 25 }
+    # 荆棘 anvil 8 是因为附魔台上少见，不是因为强；实战里没人抢
+    THORNS:             { rarity: 0.75 }
+    # 穿刺只对水生生物有效，5 级的曲线会把它顶到锋利 V 之上
+    IMPALING:           { rarity: 0.55 }
+    # 爆炸保护 anvil 4 = 摔落保护的 4 倍，用途却窄得多
+    BLAST_PROTECTION:   { rarity: 1.2 }
+    # 亡灵杀手 / 节肢杀手 anvil 2 = 锋利的 2 倍，实战里严格弱于锋利。
+    # 不压下来就会出现“更弱的附魔更贵”的倒挂
+    SMITE:              { rarity: 0.5 }
+    BANE_OF_ARTHROPODS: { rarity: 0.4 }
 
 items:
-  # --------------------------- 矿物 ---------------------------
-  COAL:
-    category: ores
-    buy: 1.20
-    sell: 0.60
-    daily-sell: 4096
-    dynamic: { enabled: true, step-bp: 1 }
-  CHARCOAL:
-    category: ores
-    buy: 1.20
-    sell: 0.55
-  RAW_IRON:
-    category: ores
-    buy: 5.00
-    sell: 2.50
-  IRON_INGOT:
-    category: ores
-    buy: 6.00
-    sell: 3.00
-    daily-sell: 2048
-    dynamic: { enabled: true, step-bp: 2 }
-  RAW_COPPER:
-    category: ores
-    buy: 1.60
-    sell: 0.80
-  COPPER_INGOT:
-    category: ores
-    buy: 2.00
-    sell: 1.00
-    daily-sell: 4096
-    dynamic: { enabled: true, step-bp: 1 }
-  RAW_GOLD:
-    category: ores
-    buy: 12.00
-    sell: 6.00
-  GOLD_INGOT:
-    category: ores
-    buy: 14.00
-    sell: 7.00
-    daily-sell: 1024
-    dynamic: { enabled: true, step-bp: 3 }
-  REDSTONE:
-    category: ores
-    buy: 1.00
-    sell: 0.50
-    daily-sell: 4096
-  LAPIS_LAZULI:
-    category: ores
-    buy: 2.40
-    sell: 1.20
-    daily-sell: 2048
-  DIAMOND:
-    category: ores
-    buy: 80.00
-    sell: 40.00
-    daily-sell: 256
-    dynamic: { enabled: true, step-bp: 20 }
-  EMERALD:
-    category: ores
-    buy: 30.00
-    sell: 15.00
-    daily-sell: 512
-    dynamic: { enabled: true, step-bp: 8 }
-  QUARTZ:
-    category: ores
-    buy: 2.00
-    sell: 1.00
+  # --------------------------- 矿物 · 原矿 / 锭 / 粒 / 矿物方块 ---------------------------
+  # 原矿方块 buy: 0 —— 只回收不出售，堵掉“买矿石 + 时运”这条印钞路
   AMETHYST_SHARD:
     category: ores
     buy: 4.00
@@ -135,190 +177,2642 @@ items:
     buy: 260.00
     sell: 130.00
     daily-sell: 64
-  NETHERITE_SCRAP:
+  # 略低于煤炭，防止“买原木烧炭卖”回本
+  CHARCOAL:
     category: ores
-    buy: 240.00
-    sell: 120.00
-    daily-sell: 64
+    buy: 1.20
+    sell: 0.55
+  COAL:
+    category: ores
+    buy: 1.20
+    sell: 0.60
+    daily-sell: 4096
+    dynamic: { enabled: true, step-bp: 1 }
+  COAL_BLOCK:
+    category: ores
+    buy: 10.80
+    sell: 5.40
+    daily-sell: 455
+  COAL_ORE:
+    category: ores
+    buy: 0.00
+    sell: 0.60
+  COPPER_BLOCK:
+    category: ores
+    buy: 18.00
+    sell: 9.00
+    daily-sell: 455
+  COPPER_INGOT:
+    category: ores
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 4096
+    dynamic: { enabled: true, step-bp: 1 }
+  COPPER_NUGGET:
+    category: ores
+    buy: 0.28
+    sell: 0.14
+    daily-sell: 36864
+  COPPER_ORE:
+    category: ores
+    buy: 0.00
+    sell: 2.40
+  DEEPSLATE_COAL_ORE:
+    category: ores
+    buy: 0.00
+    sell: 0.60
+  DEEPSLATE_COPPER_ORE:
+    category: ores
+    buy: 0.00
+    sell: 2.40
+  DEEPSLATE_DIAMOND_ORE:
+    category: ores
+    buy: 0.00
+    sell: 40.00
+  DEEPSLATE_EMERALD_ORE:
+    category: ores
+    buy: 0.00
+    sell: 15.00
+  DEEPSLATE_GOLD_ORE:
+    category: ores
+    buy: 0.00
+    sell: 6.00
+  DEEPSLATE_IRON_ORE:
+    category: ores
+    buy: 0.00
+    sell: 2.50
+  DEEPSLATE_LAPIS_ORE:
+    category: ores
+    buy: 0.00
+    sell: 4.80
+  DEEPSLATE_REDSTONE_ORE:
+    category: ores
+    buy: 0.00
+    sell: 2.00
+  DIAMOND:
+    category: ores
+    buy: 80.00
+    sell: 40.00
+    daily-sell: 256
+    dynamic: { enabled: true, step-bp: 19 }
+  DIAMOND_BLOCK:
+    category: ores
+    buy: 720.00
+    sell: 360.00
+    daily-sell: 28
+  DIAMOND_ORE:
+    category: ores
+    buy: 0.00
+    sell: 40.00
+  EMERALD:
+    category: ores
+    buy: 30.00
+    sell: 15.00
+    daily-sell: 512
+    dynamic: { enabled: true, step-bp: 8 }
+  EMERALD_BLOCK:
+    category: ores
+    buy: 270.00
+    sell: 135.00
+    daily-sell: 56
+  EMERALD_ORE:
+    category: ores
+    buy: 0.00
+    sell: 15.00
+  GOLD_BLOCK:
+    category: ores
+    buy: 126.00
+    sell: 63.00
+    daily-sell: 113
+  GOLD_INGOT:
+    category: ores
+    buy: 14.00
+    sell: 7.00
+    daily-sell: 1024
+    dynamic: { enabled: true, step-bp: 3 }
+  GOLD_NUGGET:
+    category: ores
+    buy: 1.96
+    sell: 0.98
+    daily-sell: 9216
+  GOLD_ORE:
+    category: ores
+    buy: 0.00
+    sell: 6.00
+  IRON_BLOCK:
+    category: ores
+    buy: 54.00
+    sell: 27.00
+    daily-sell: 227
+  IRON_INGOT:
+    category: ores
+    buy: 6.00
+    sell: 3.00
+    daily-sell: 2048
+    dynamic: { enabled: true, step-bp: 2 }
+  IRON_NUGGET:
+    category: ores
+    buy: 0.84
+    sell: 0.42
+    daily-sell: 18432
+  IRON_ORE:
+    category: ores
+    buy: 0.00
+    sell: 2.50
+  LAPIS_BLOCK:
+    category: ores
+    buy: 21.60
+    sell: 10.80
+    daily-sell: 227
+  LAPIS_LAZULI:
+    category: ores
+    buy: 2.40
+    sell: 1.20
+    daily-sell: 2048
+  LAPIS_ORE:
+    category: ores
+    buy: 0.00
+    sell: 4.80
+  NETHERITE_BLOCK:
+    category: ores
+    buy: 11250.00
+    sell: 5625.00
   NETHERITE_INGOT:
     category: ores
     buy: 1000.00
     sell: 500.00
     daily-sell: 16
-  # 9 合 1 方块按 9 倍精确定价，正反合成都不产生差价
-  COAL_BLOCK:
+  NETHERITE_SCRAP:
     category: ores
-    buy: 10.80
-    sell: 5.40
-  IRON_BLOCK:
+    buy: 240.00
+    sell: 120.00
+    daily-sell: 64
+  NETHER_GOLD_ORE:
     category: ores
-    buy: 54.00
-    sell: 27.00
-  COPPER_BLOCK:
+    buy: 0.00
+    sell: 2.94
+  NETHER_QUARTZ_ORE:
+    category: ores
+    buy: 0.00
+    sell: 1.00
+  QUARTZ:
+    category: ores
+    buy: 2.00
+    sell: 1.00
+  RAW_COPPER:
+    category: ores
+    buy: 1.60
+    sell: 0.80
+  RAW_COPPER_BLOCK:
     category: ores
     buy: 18.00
     sell: 9.00
-  GOLD_BLOCK:
+  RAW_GOLD:
     category: ores
-    buy: 126.00
-    sell: 63.00
-  REDSTONE_BLOCK:
+    buy: 12.00
+    sell: 6.00
+  RAW_GOLD_BLOCK:
     category: ores
-    buy: 9.00
-    sell: 4.50
-  LAPIS_BLOCK:
+    buy: 135.00
+    sell: 67.50
+  RAW_IRON:
     category: ores
-    buy: 21.60
-    sell: 10.80
-  DIAMOND_BLOCK:
+    buy: 5.00
+    sell: 2.50
+  RAW_IRON_BLOCK:
     category: ores
-    buy: 720.00
-    sell: 360.00
-  EMERALD_BLOCK:
+    buy: 56.26
+    sell: 28.13
+  REDSTONE_ORE:
     category: ores
-    buy: 270.00
-    sell: 135.00
+    buy: 0.00
+    sell: 2.00
 
-  # --------------------------- 建材 ---------------------------
-  COBBLESTONE:
-    category: blocks
-    buy: 0.02
-    sell: 0.01
-  STONE:
-    category: blocks
+  # --------------------------- 石材 · 石头族 / 砖块 / 台阶楼梯墙 / 硫磺朱砂 ---------------------------
+  AMETHYST_BLOCK:
+    category: stone
+    buy: 20.00
+    sell: 10.00
+  ANDESITE:
+    category: stone
     buy: 0.04
     sell: 0.02
-  DEEPSLATE:
-    category: blocks
-    buy: 0.02
-    sell: 0.01
-  COBBLED_DEEPSLATE:
-    category: blocks
-    buy: 0.02
-    sell: 0.01
-  DIRT:
-    category: blocks
-    buy: 0.02
-    sell: 0.01
-  SAND:
-    category: blocks
+  ANDESITE_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  ANDESITE_STAIRS:
+    category: stone
     buy: 0.06
     sell: 0.03
-  RED_SAND:
-    category: blocks
+  ANDESITE_WALL:
+    category: stone
     buy: 0.06
     sell: 0.03
-  GRAVEL:
-    category: blocks
-    buy: 0.06
-    sell: 0.03
-  CLAY_BALL:
-    category: blocks
+  BRICK:
+    category: stone
+    buy: 0.26
+    sell: 0.13
+  BRICKS:
+    category: stone
+    buy: 1.30
+    sell: 0.65
+  BRICK_SLAB:
+    category: stone
+    buy: 0.82
+    sell: 0.41
+  BRICK_STAIRS:
+    category: stone
+    buy: 1.64
+    sell: 0.82
+  BRICK_WALL:
+    category: stone
+    buy: 1.64
+    sell: 0.82
+  CALCITE:
+    category: stone
     buy: 0.20
     sell: 0.10
-  OAK_LOG:
-    category: blocks
-    buy: 0.80
-    sell: 0.40
-  SPRUCE_LOG:
-    category: blocks
-    buy: 0.80
-    sell: 0.40
-  BIRCH_LOG:
-    category: blocks
-    buy: 0.80
-    sell: 0.40
-  JUNGLE_LOG:
-    category: blocks
-    buy: 0.80
-    sell: 0.40
+  CHISELED_CINNABAR:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  CHISELED_COPPER:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  CHISELED_DEEPSLATE:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  CHISELED_RED_SANDSTONE:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  CHISELED_RESIN_BRICKS:
+    category: stone
+    buy: 15.64
+    sell: 7.82
+  CHISELED_SANDSTONE:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  CHISELED_STONE_BRICKS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  CHISELED_SULFUR:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  CHISELED_TUFF:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  CHISELED_TUFF_BRICKS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  CINNABAR:
+    category: stone
+    buy: 2.00
+    sell: 1.00
+  CINNABAR_BRICKS:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  CINNABAR_BRICK_SLAB:
+    category: stone
+    buy: 1.26
+    sell: 0.63
+  CINNABAR_BRICK_STAIRS:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  CINNABAR_BRICK_WALL:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  CINNABAR_SLAB:
+    category: stone
+    buy: 1.26
+    sell: 0.63
+  CINNABAR_STAIRS:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  CINNABAR_WALL:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  COBBLED_DEEPSLATE:
+    category: stone
+    buy: 0.02
+    sell: 0.01
+  COBBLED_DEEPSLATE_SLAB:
+    category: stone
+    buy: 0.02
+    sell: 0.01
+  COBBLED_DEEPSLATE_STAIRS:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  COBBLED_DEEPSLATE_WALL:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  COBBLESTONE:
+    category: stone
+    buy: 0.02
+    sell: 0.01
+  COBBLESTONE_SLAB:
+    category: stone
+    buy: 0.02
+    sell: 0.01
+  COBBLESTONE_STAIRS:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  COBBLESTONE_WALL:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  COPPER_GRATE:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  CRACKED_DEEPSLATE_BRICKS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  CRACKED_DEEPSLATE_TILES:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  CRACKED_POLISHED_BLACKSTONE_BRICKS:
+    category: stone
+    buy: 0.18
+    sell: 0.09
+  CRACKED_STONE_BRICKS:
+    category: stone
+    buy: 0.08
+    sell: 0.04
+  CUT_COPPER:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  CUT_COPPER_SLAB:
+    category: stone
+    buy: 2.82
+    sell: 1.41
+  CUT_COPPER_STAIRS:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  CUT_RED_SANDSTONE:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  CUT_RED_SANDSTONE_SLAB:
+    category: stone
+    buy: 0.20
+    sell: 0.10
+  CUT_SANDSTONE:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  CUT_SANDSTONE_SLAB:
+    category: stone
+    buy: 0.20
+    sell: 0.10
+  DARK_PRISMARINE:
+    category: stone
+    buy: 11.26
+    sell: 5.63
+  DARK_PRISMARINE_SLAB:
+    category: stone
+    buy: 7.04
+    sell: 3.52
+  DARK_PRISMARINE_STAIRS:
+    category: stone
+    buy: 14.08
+    sell: 7.04
+  DEEPSLATE:
+    category: stone
+    buy: 0.02
+    sell: 0.01
+  DEEPSLATE_BRICKS:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  DEEPSLATE_BRICK_SLAB:
+    category: stone
+    buy: 0.02
+    sell: 0.01
+  DEEPSLATE_BRICK_STAIRS:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  DEEPSLATE_BRICK_WALL:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  DEEPSLATE_TILES:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  DEEPSLATE_TILE_SLAB:
+    category: stone
+    buy: 0.02
+    sell: 0.01
+  DEEPSLATE_TILE_STAIRS:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  DEEPSLATE_TILE_WALL:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  DIORITE:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  DIORITE_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  DIORITE_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  DIORITE_WALL:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  DRIPSTONE_BLOCK:
+    category: stone
+    buy: 2.00
+    sell: 1.00
+  EXPOSED_CHISELED_COPPER:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  EXPOSED_COPPER:
+    category: stone
+    buy: 18.00
+    sell: 9.00
+  EXPOSED_COPPER_GRATE:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  EXPOSED_CUT_COPPER:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  EXPOSED_CUT_COPPER_SLAB:
+    category: stone
+    buy: 2.82
+    sell: 1.41
+  EXPOSED_CUT_COPPER_STAIRS:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  GRANITE:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  GRANITE_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  GRANITE_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  GRANITE_WALL:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  MOSSY_COBBLESTONE:
+    category: stone
+    buy: 0.54
+    sell: 0.27
+  MOSSY_COBBLESTONE_SLAB:
+    category: stone
+    buy: 0.34
+    sell: 0.17
+  MOSSY_COBBLESTONE_STAIRS:
+    category: stone
+    buy: 0.68
+    sell: 0.34
+  MOSSY_COBBLESTONE_WALL:
+    category: stone
+    buy: 0.68
+    sell: 0.34
+  MOSSY_STONE_BRICKS:
+    category: stone
+    buy: 0.58
+    sell: 0.29
+  MOSSY_STONE_BRICK_SLAB:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  MOSSY_STONE_BRICK_STAIRS:
+    category: stone
+    buy: 0.74
+    sell: 0.37
+  MOSSY_STONE_BRICK_WALL:
+    category: stone
+    buy: 0.74
+    sell: 0.37
+  MUD_BRICKS:
+    category: stone
+    buy: 0.58
+    sell: 0.29
+  MUD_BRICK_SLAB:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  MUD_BRICK_STAIRS:
+    category: stone
+    buy: 0.74
+    sell: 0.37
+  MUD_BRICK_WALL:
+    category: stone
+    buy: 0.74
+    sell: 0.37
+  OBSIDIAN:
+    category: stone
+    buy: 3.00
+    sell: 1.50
+  OXIDIZED_CHISELED_COPPER:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  OXIDIZED_COPPER:
+    category: stone
+    buy: 18.00
+    sell: 9.00
+  OXIDIZED_COPPER_GRATE:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  OXIDIZED_CUT_COPPER:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  OXIDIZED_CUT_COPPER_SLAB:
+    category: stone
+    buy: 2.82
+    sell: 1.41
+  OXIDIZED_CUT_COPPER_STAIRS:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  PACKED_MUD:
+    category: stone
+    buy: 0.46
+    sell: 0.23
+  POINTED_DRIPSTONE:
+    category: stone
+    buy: 0.40
+    sell: 0.20
+  POLISHED_ANDESITE:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POLISHED_ANDESITE_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  POLISHED_ANDESITE_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POLISHED_CINNABAR:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  POLISHED_CINNABAR_SLAB:
+    category: stone
+    buy: 1.26
+    sell: 0.63
+  POLISHED_CINNABAR_STAIRS:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  POLISHED_CINNABAR_WALL:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  POLISHED_DEEPSLATE:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  POLISHED_DEEPSLATE_SLAB:
+    category: stone
+    buy: 0.02
+    sell: 0.01
+  POLISHED_DEEPSLATE_STAIRS:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  POLISHED_DEEPSLATE_WALL:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  POLISHED_DIORITE:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POLISHED_DIORITE_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  POLISHED_DIORITE_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POLISHED_GRANITE:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POLISHED_GRANITE_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  POLISHED_GRANITE_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POLISHED_SULFUR:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  POLISHED_SULFUR_SLAB:
+    category: stone
+    buy: 1.88
+    sell: 0.94
+  POLISHED_SULFUR_STAIRS:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  POLISHED_SULFUR_WALL:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  POLISHED_TUFF:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POLISHED_TUFF_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  POLISHED_TUFF_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POLISHED_TUFF_WALL:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  POTENT_SULFUR:
+    category: stone
+    buy: 33.76
+    sell: 16.88
+    daily-sell: 512
+  PRISMARINE:
+    category: stone
+    buy: 5.00
+    sell: 2.50
+  PRISMARINE_BRICKS:
+    category: stone
+    buy: 11.26
+    sell: 5.63
+  PRISMARINE_BRICK_SLAB:
+    category: stone
+    buy: 7.04
+    sell: 3.52
+  PRISMARINE_BRICK_STAIRS:
+    category: stone
+    buy: 14.08
+    sell: 7.04
+  PRISMARINE_CRYSTALS:
+    category: stone
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 1024
+  PRISMARINE_SHARD:
+    category: stone
+    buy: 1.00
+    sell: 0.50
+    daily-sell: 4096
+  PRISMARINE_SLAB:
+    category: stone
+    buy: 3.14
+    sell: 1.57
+  PRISMARINE_STAIRS:
+    category: stone
+    buy: 6.26
+    sell: 3.13
+  PRISMARINE_WALL:
+    category: stone
+    buy: 6.26
+    sell: 3.13
+  RED_SANDSTONE:
+    category: stone
+    buy: 0.30
+    sell: 0.15
+  RED_SANDSTONE_SLAB:
+    category: stone
+    buy: 0.20
+    sell: 0.10
+  RED_SANDSTONE_STAIRS:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  RED_SANDSTONE_WALL:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  RESIN_BLOCK:
+    category: stone
+    buy: 22.50
+    sell: 11.25
+  RESIN_BRICK:
+    category: stone
+    buy: 2.50
+    sell: 1.25
+  RESIN_BRICKS:
+    category: stone
+    buy: 12.50
+    sell: 6.25
+  RESIN_BRICK_SLAB:
+    category: stone
+    buy: 7.82
+    sell: 3.91
+  RESIN_BRICK_STAIRS:
+    category: stone
+    buy: 15.64
+    sell: 7.82
+  RESIN_BRICK_WALL:
+    category: stone
+    buy: 15.64
+    sell: 7.82
+  SANDSTONE:
+    category: stone
+    buy: 0.30
+    sell: 0.15
+  SANDSTONE_SLAB:
+    category: stone
+    buy: 0.20
+    sell: 0.10
+  SANDSTONE_STAIRS:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  SANDSTONE_WALL:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  SMOOTH_RED_SANDSTONE:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  SMOOTH_RED_SANDSTONE_SLAB:
+    category: stone
+    buy: 0.24
+    sell: 0.12
+  SMOOTH_RED_SANDSTONE_STAIRS:
+    category: stone
+    buy: 0.48
+    sell: 0.24
+  SMOOTH_SANDSTONE:
+    category: stone
+    buy: 0.38
+    sell: 0.19
+  SMOOTH_SANDSTONE_SLAB:
+    category: stone
+    buy: 0.24
+    sell: 0.12
+  SMOOTH_SANDSTONE_STAIRS:
+    category: stone
+    buy: 0.48
+    sell: 0.24
+  SMOOTH_STONE:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  SMOOTH_STONE_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  STONE:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  STONECUTTER:
+    category: stone
+    buy: 7.66
+    sell: 3.83
+  STONE_BRICKS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  STONE_BRICK_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  STONE_BRICK_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  STONE_BRICK_WALL:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  STONE_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  STONE_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  SULFUR:
+    category: stone
+    buy: 3.00
+    sell: 1.50
+    daily-sell: 2048
+  SULFUR_BRICKS:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  SULFUR_BRICK_SLAB:
+    category: stone
+    buy: 1.88
+    sell: 0.94
+  SULFUR_BRICK_STAIRS:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  SULFUR_BRICK_WALL:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  SULFUR_SLAB:
+    category: stone
+    buy: 1.88
+    sell: 0.94
+  # 自然生成物，只回收不出售
+  SULFUR_SPIKE:
+    category: stone
+    buy: 0.00
+    sell: 1.50
+  SULFUR_STAIRS:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  SULFUR_WALL:
+    category: stone
+    buy: 3.76
+    sell: 1.88
+  TUFF:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  TUFF_BRICKS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  TUFF_BRICK_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  TUFF_BRICK_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  TUFF_BRICK_WALL:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  TUFF_SLAB:
+    category: stone
+    buy: 0.04
+    sell: 0.02
+  TUFF_STAIRS:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  TUFF_WALL:
+    category: stone
+    buy: 0.06
+    sell: 0.03
+  WAXED_CHISELED_COPPER:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_COPPER_BLOCK:
+    category: stone
+    buy: 25.50
+    sell: 12.75
+  WAXED_COPPER_GRATE:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_CUT_COPPER:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_CUT_COPPER_SLAB:
+    category: stone
+    buy: 4.00
+    sell: 2.00
+  WAXED_CUT_COPPER_STAIRS:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_EXPOSED_CHISELED_COPPER:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_EXPOSED_COPPER:
+    category: stone
+    buy: 25.50
+    sell: 12.75
+  WAXED_EXPOSED_COPPER_GRATE:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_EXPOSED_CUT_COPPER:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_EXPOSED_CUT_COPPER_SLAB:
+    category: stone
+    buy: 4.00
+    sell: 2.00
+  WAXED_EXPOSED_CUT_COPPER_STAIRS:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_OXIDIZED_CHISELED_COPPER:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_OXIDIZED_COPPER:
+    category: stone
+    buy: 25.50
+    sell: 12.75
+  WAXED_OXIDIZED_COPPER_GRATE:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_OXIDIZED_CUT_COPPER:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_OXIDIZED_CUT_COPPER_SLAB:
+    category: stone
+    buy: 4.00
+    sell: 2.00
+  WAXED_OXIDIZED_CUT_COPPER_STAIRS:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_WEATHERED_CHISELED_COPPER:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_WEATHERED_COPPER:
+    category: stone
+    buy: 25.50
+    sell: 12.75
+  WAXED_WEATHERED_COPPER_GRATE:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_WEATHERED_CUT_COPPER:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WAXED_WEATHERED_CUT_COPPER_SLAB:
+    category: stone
+    buy: 4.00
+    sell: 2.00
+  WAXED_WEATHERED_CUT_COPPER_STAIRS:
+    category: stone
+    buy: 7.98
+    sell: 3.99
+  WEATHERED_CHISELED_COPPER:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  WEATHERED_COPPER:
+    category: stone
+    buy: 18.00
+    sell: 9.00
+  WEATHERED_COPPER_GRATE:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  WEATHERED_CUT_COPPER:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+  WEATHERED_CUT_COPPER_SLAB:
+    category: stone
+    buy: 2.82
+    sell: 1.41
+  WEATHERED_CUT_COPPER_STAIRS:
+    category: stone
+    buy: 5.64
+    sell: 2.82
+
+  # --------------------------- 木材 · 原木 / 木板 / 门窗告示牌 / 船 ---------------------------
+  ACACIA_BOAT:
+    category: wood
+    buy: 1.64
+    sell: 0.82
+  ACACIA_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  ACACIA_CHEST_BOAT:
+    category: wood
+    buy: 3.30
+    sell: 1.65
+  ACACIA_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  ACACIA_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  ACACIA_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  ACACIA_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
   ACACIA_LOG:
-    category: blocks
+    category: wood
     buy: 0.80
     sell: 0.40
-  DARK_OAK_LOG:
-    category: blocks
+  ACACIA_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  ACACIA_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  ACACIA_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  ACACIA_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  ACACIA_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  ACACIA_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  ACACIA_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  ACACIA_WOOD:
+    category: wood
     buy: 0.80
     sell: 0.40
-  MANGROVE_LOG:
-    category: blocks
+  BAMBOO_BLOCK:
+    category: wood
+    buy: 1.14
+    sell: 0.57
+  BAMBOO_BUTTON:
+    category: wood
+    buy: 0.64
+    sell: 0.32
+  BAMBOO_CHEST_RAFT:
+    category: wood
+    buy: 5.18
+    sell: 2.59
+  BAMBOO_DOOR:
+    category: wood
+    buy: 1.26
+    sell: 0.63
+  BAMBOO_FENCE:
+    category: wood
+    buy: 0.88
+    sell: 0.44
+  BAMBOO_FENCE_GATE:
+    category: wood
+    buy: 1.46
+    sell: 0.73
+  BAMBOO_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  BAMBOO_MOSAIC:
+    category: wood
     buy: 0.80
     sell: 0.40
+  BAMBOO_MOSAIC_SLAB:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  BAMBOO_MOSAIC_STAIRS:
+    category: wood
+    buy: 1.50
+    sell: 0.75
+  BAMBOO_PLANKS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  BAMBOO_PRESSURE_PLATE:
+    category: wood
+    buy: 1.26
+    sell: 0.63
+  BAMBOO_RAFT:
+    category: wood
+    buy: 3.14
+    sell: 1.57
+  BAMBOO_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  BAMBOO_SIGN:
+    category: wood
+    buy: 1.28
+    sell: 0.64
+  BAMBOO_SLAB:
+    category: wood
+    buy: 0.32
+    sell: 0.16
+  BAMBOO_STAIRS:
+    category: wood
+    buy: 0.94
+    sell: 0.47
+  BAMBOO_TRAPDOOR:
+    category: wood
+    buy: 1.88
+    sell: 0.94
+  BIRCH_BOAT:
+    category: wood
+    buy: 1.64
+    sell: 0.82
+  BIRCH_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  BIRCH_CHEST_BOAT:
+    category: wood
+    buy: 3.30
+    sell: 1.65
+  BIRCH_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  BIRCH_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  BIRCH_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  BIRCH_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  BIRCH_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  BIRCH_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  BIRCH_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  BIRCH_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  BIRCH_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  BIRCH_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  BIRCH_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  BIRCH_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  BIRCH_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  BOOKSHELF:
+    category: wood
+    buy: 12.00
+    sell: 6.00
+  CHERRY_BOAT:
+    category: wood
+    buy: 1.64
+    sell: 0.82
+  CHERRY_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  CHERRY_CHEST_BOAT:
+    category: wood
+    buy: 3.30
+    sell: 1.65
+  CHERRY_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  CHERRY_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  CHERRY_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  CHERRY_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
   CHERRY_LOG:
-    category: blocks
+    category: wood
     buy: 0.80
     sell: 0.40
-  PALE_OAK_LOG:
-    category: blocks
+  CHERRY_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  CHERRY_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  CHERRY_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  CHERRY_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  CHERRY_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  CHERRY_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  CHERRY_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  CHERRY_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  CHISELED_BOOKSHELF:
+    category: wood
+    buy: 1.06
+    sell: 0.53
+  CRIMSON_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  CRIMSON_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  CRIMSON_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  CRIMSON_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  CRIMSON_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  CRIMSON_HYPHAE:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  CRIMSON_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  CRIMSON_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  CRIMSON_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  CRIMSON_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  CRIMSON_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  CRIMSON_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  CRIMSON_STEM:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  CRIMSON_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  DARK_OAK_BOAT:
+    category: wood
+    buy: 1.64
+    sell: 0.82
+  DARK_OAK_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  DARK_OAK_CHEST_BOAT:
+    category: wood
+    buy: 3.30
+    sell: 1.65
+  DARK_OAK_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  DARK_OAK_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  DARK_OAK_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  DARK_OAK_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  DARK_OAK_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  DARK_OAK_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  DARK_OAK_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  DARK_OAK_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  DARK_OAK_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  DARK_OAK_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  DARK_OAK_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  DARK_OAK_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  DARK_OAK_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  JUNGLE_BOAT:
+    category: wood
+    buy: 1.64
+    sell: 0.82
+  JUNGLE_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  JUNGLE_CHEST_BOAT:
+    category: wood
+    buy: 3.30
+    sell: 1.65
+  JUNGLE_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  JUNGLE_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  JUNGLE_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  JUNGLE_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  JUNGLE_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  JUNGLE_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  JUNGLE_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  JUNGLE_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  JUNGLE_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  JUNGLE_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  JUNGLE_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  JUNGLE_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  JUNGLE_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  LADDER:
+    category: wood
+    buy: 0.12
+    sell: 0.06
+  MANGROVE_BOAT:
+    category: wood
+    buy: 1.64
+    sell: 0.82
+  MANGROVE_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  MANGROVE_CHEST_BOAT:
+    category: wood
+    buy: 3.30
+    sell: 1.65
+  MANGROVE_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  MANGROVE_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  MANGROVE_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  MANGROVE_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  MANGROVE_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  MANGROVE_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  MANGROVE_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  MANGROVE_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  MANGROVE_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  MANGROVE_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  MANGROVE_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  MANGROVE_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  MANGROVE_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  OAK_BOAT:
+    category: wood
+    buy: 0.64
+    sell: 0.32
+  OAK_BUTTON:
+    category: wood
+    buy: 0.14
+    sell: 0.07
+  OAK_CHEST_BOAT:
+    category: wood
+    buy: 2.06
+    sell: 1.03
+  OAK_DOOR:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  OAK_FENCE:
+    category: wood
+    buy: 0.20
+    sell: 0.10
+  OAK_FENCE_GATE:
+    category: wood
+    buy: 0.46
+    sell: 0.23
+  OAK_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  OAK_LOG:
+    category: wood
     buy: 0.80
     sell: 0.40
   OAK_PLANKS:
-    category: blocks
+    category: wood
     buy: 0.10
     sell: 0.05
+  OAK_PRESSURE_PLATE:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  OAK_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  OAK_SIGN:
+    category: wood
+    buy: 0.28
+    sell: 0.14
+  OAK_SLAB:
+    category: wood
+    buy: 0.08
+    sell: 0.04
+  OAK_STAIRS:
+    category: wood
+    buy: 0.20
+    sell: 0.10
+  OAK_TRAPDOOR:
+    category: wood
+    buy: 0.38
+    sell: 0.19
+  OAK_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  PALE_OAK_BOAT:
+    category: wood
+    buy: 1.64
+    sell: 0.82
+  PALE_OAK_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  PALE_OAK_CHEST_BOAT:
+    category: wood
+    buy: 3.30
+    sell: 1.65
+  PALE_OAK_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  PALE_OAK_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  PALE_OAK_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  PALE_OAK_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  PALE_OAK_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  PALE_OAK_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  PALE_OAK_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  PALE_OAK_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  PALE_OAK_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  PALE_OAK_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  PALE_OAK_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  PALE_OAK_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  PALE_OAK_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  SPRUCE_BOAT:
+    category: wood
+    buy: 1.64
+    sell: 0.82
+  SPRUCE_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  SPRUCE_CHEST_BOAT:
+    category: wood
+    buy: 3.30
+    sell: 1.65
+  SPRUCE_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  SPRUCE_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  SPRUCE_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  SPRUCE_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  SPRUCE_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  SPRUCE_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  SPRUCE_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  SPRUCE_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  SPRUCE_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  SPRUCE_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  SPRUCE_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  SPRUCE_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+  SPRUCE_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
   STICK:
-    category: blocks
+    category: wood
     buy: 0.04
     sell: 0.02
-  OBSIDIAN:
-    category: blocks
-    buy: 3.00
-    sell: 1.50
-  GLOWSTONE:
-    category: blocks
+  STRIPPED_ACACIA_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_ACACIA_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_BAMBOO_BLOCK:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_BIRCH_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_BIRCH_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_CHERRY_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_CHERRY_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_CRIMSON_HYPHAE:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_CRIMSON_STEM:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_DARK_OAK_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_DARK_OAK_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_JUNGLE_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_JUNGLE_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_MANGROVE_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_MANGROVE_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_OAK_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_OAK_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_PALE_OAK_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_PALE_OAK_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_SPRUCE_LOG:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_SPRUCE_WOOD:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_WARPED_HYPHAE:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  STRIPPED_WARPED_STEM:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  WARPED_BUTTON:
+    category: wood
+    buy: 0.34
+    sell: 0.17
+  WARPED_DOOR:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  WARPED_FENCE:
+    category: wood
+    buy: 0.48
+    sell: 0.24
+  WARPED_FENCE_GATE:
+    category: wood
+    buy: 0.86
+    sell: 0.43
+  WARPED_HANGING_SIGN:
+    category: wood
+    buy: 5.00
+    sell: 2.50
+  WARPED_HYPHAE:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  WARPED_PLANKS:
+    category: wood
+    buy: 0.26
+    sell: 0.13
+  WARPED_PRESSURE_PLATE:
+    category: wood
+    buy: 0.66
+    sell: 0.33
+  WARPED_SHELF:
+    category: wood
+    buy: 1.00
+    sell: 0.50
+  WARPED_SIGN:
+    category: wood
+    buy: 0.68
+    sell: 0.34
+  WARPED_SLAB:
+    category: wood
+    buy: 0.18
+    sell: 0.09
+  WARPED_STAIRS:
+    category: wood
+    buy: 0.50
+    sell: 0.25
+  WARPED_STEM:
+    category: wood
+    buy: 0.80
+    sell: 0.40
+  WARPED_TRAPDOOR:
+    category: wood
+    buy: 0.98
+    sell: 0.49
+
+  # --------------------------- 自然 · 泥沙 / 树叶树苗 / 花草 / 珊瑚 / 冰雪 ---------------------------
+  ACACIA_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  ACACIA_SAPLING:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  ALLIUM:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  AMETHYST_CLUSTER:
+    category: nature
+    buy: 16.00
+    sell: 8.00
+  AZALEA:
+    category: nature
+    buy: 1.00
+    sell: 0.50
+  AZALEA_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  AZURE_BLUET:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  BIG_DRIPLEAF:
+    category: nature
+    buy: 1.00
+    sell: 0.50
+  BIRCH_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  BIRCH_SAPLING:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  BLUE_ICE:
+    category: nature
+    buy: 50.64
+    sell: 25.32
+  BLUE_ORCHID:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  BRAIN_CORAL:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  BRAIN_CORAL_BLOCK:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  BRAIN_CORAL_FAN:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  BUBBLE_CORAL:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  BUBBLE_CORAL_BLOCK:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  BUBBLE_CORAL_FAN:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  BUSH:
+    category: nature
+    buy: 0.40
+    sell: 0.20
+  CHERRY_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  CHERRY_SAPLING:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  CLAY:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  CLAY_BALL:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  CLOSED_EYEBLOSSOM:
+    category: nature
+    buy: 2.00
+    sell: 1.00
+  COARSE_DIRT:
+    category: nature
+    buy: 0.18
+    sell: 0.09
+  CORNFLOWER:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  CREAKING_HEART:
+    category: nature
+    buy: 24.00
+    sell: 12.00
+  DANDELION:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  DARK_OAK_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  DARK_OAK_SAPLING:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  DEAD_BRAIN_CORAL:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_BRAIN_CORAL_BLOCK:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_BRAIN_CORAL_FAN:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_BUBBLE_CORAL:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_BUBBLE_CORAL_BLOCK:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_BUBBLE_CORAL_FAN:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_BUSH:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  DEAD_FIRE_CORAL:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_FIRE_CORAL_BLOCK:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_FIRE_CORAL_FAN:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_HORN_CORAL:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_HORN_CORAL_BLOCK:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_HORN_CORAL_FAN:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_TUBE_CORAL:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_TUBE_CORAL_BLOCK:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DEAD_TUBE_CORAL_FAN:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  DIRT:
+    category: nature
+    buy: 0.02
+    sell: 0.01
+  DRIED_GHAST:
+    category: nature
+    buy: 40.00
+    sell: 20.00
+  FERN:
+    category: nature
+    buy: 0.10
+    sell: 0.05
+  FIREFLY_BUSH:
+    category: nature
+    buy: 1.00
+    sell: 0.50
+  FIRE_CORAL:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  FIRE_CORAL_BLOCK:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  FIRE_CORAL_FAN:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  FLINT:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  FLOWERING_AZALEA:
+    category: nature
+    buy: 1.20
+    sell: 0.60
+  FLOWERING_AZALEA_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  GLOW_LICHEN:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  GOLDEN_DANDELION:
+    category: nature
+    buy: 20.36
+    sell: 10.18
+  GRASS_BLOCK:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  # 时运 III 让沙砾 100% 出燧石，买价必须 ≥ 燧石卖价
+  GRAVEL:
+    category: nature
+    buy: 0.24
+    sell: 0.12
+  HANGING_ROOTS:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  HORN_CORAL:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  HORN_CORAL_BLOCK:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  HORN_CORAL_FAN:
+    category: nature
     buy: 1.60
     sell: 0.80
   ICE:
-    category: blocks
+    category: nature
     buy: 0.40
     sell: 0.20
-  SNOWBALL:
-    category: blocks
-    buy: 0.04
-    sell: 0.02
+  JUNGLE_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  JUNGLE_SAPLING:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  LARGE_AMETHYST_BUD:
+    category: nature
+    buy: 8.00
+    sell: 4.00
+  LARGE_FERN:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  LEAF_LITTER:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  LILAC:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  LILY_OF_THE_VALLEY:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  LILY_PAD:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  MANGROVE_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  MANGROVE_PROPAGULE:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  MANGROVE_ROOTS:
+    category: nature
+    buy: 0.40
+    sell: 0.20
+  MEDIUM_AMETHYST_BUD:
+    category: nature
+    buy: 4.00
+    sell: 2.00
   MOSS_BLOCK:
-    category: blocks
+    category: nature
     buy: 1.00
     sell: 0.50
-  PRISMARINE_SHARD:
-    category: blocks
-    buy: 1.00
-    sell: 0.50
-  PRISMARINE_CRYSTALS:
-    category: blocks
+  MOSS_CARPET:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  MUD:
+    category: nature
+    buy: 0.06
+    sell: 0.03
+  MUDDY_MANGROVE_ROOTS:
+    category: nature
+    buy: 0.40
+    sell: 0.20
+  MYCELIUM:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  OAK_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  OAK_SAPLING:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  OPEN_EYEBLOSSOM:
+    category: nature
     buy: 2.00
     sell: 1.00
+  ORANGE_TULIP:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  OXEYE_DAISY:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  PACKED_ICE:
+    category: nature
+    buy: 4.50
+    sell: 2.25
+  PALE_HANGING_MOSS:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  PALE_MOSS_BLOCK:
+    category: nature
+    buy: 1.00
+    sell: 0.50
+  PALE_MOSS_CARPET:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  PALE_OAK_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  PALE_OAK_SAPLING:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  PEONY:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  PINK_PETALS:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  PINK_TULIP:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  PITCHER_PLANT:
+    category: nature
+    buy: 4.00
+    sell: 2.00
+  PODZOL:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  POPPY:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  RED_SAND:
+    category: nature
+    buy: 0.06
+    sell: 0.03
+  RED_TULIP:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  ROOTED_DIRT:
+    category: nature
+    buy: 0.10
+    sell: 0.05
+  ROSE_BUSH:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  SAND:
+    category: nature
+    buy: 0.06
+    sell: 0.03
+  SCULK:
+    category: nature
+    buy: 0.40
+    sell: 0.20
+  SCULK_CATALYST:
+    category: nature
+    buy: 8.00
+    sell: 4.00
+    daily-sell: 512
+  SCULK_SHRIEKER:
+    category: nature
+    buy: 8.00
+    sell: 4.00
+  SCULK_VEIN:
+    category: nature
+    buy: 0.40
+    sell: 0.20
+  SEAGRASS:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  SEA_PICKLE:
+    category: nature
+    buy: 1.00
+    sell: 0.50
+  SHORT_DRY_GRASS:
+    category: nature
+    buy: 0.10
+    sell: 0.05
+  SHORT_GRASS:
+    category: nature
+    buy: 0.10
+    sell: 0.05
+  SMALL_AMETHYST_BUD:
+    category: nature
+    buy: 2.00
+    sell: 1.00
+  SMALL_DRIPLEAF:
+    category: nature
+    buy: 1.00
+    sell: 0.50
+  SNOW:
+    category: nature
+    buy: 0.04
+    sell: 0.02
+  SNOWBALL:
+    category: nature
+    buy: 0.04
+    sell: 0.02
+  SNOW_BLOCK:
+    category: nature
+    buy: 0.20
+    sell: 0.10
   SPONGE:
-    category: blocks
+    category: nature
     buy: 20.00
     sell: 10.00
+  SPORE_BLOSSOM:
+    category: nature
+    buy: 2.00
+    sell: 1.00
+  SPRUCE_LEAVES:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  SPRUCE_SAPLING:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  SUNFLOWER:
+    category: nature
+    buy: 0.80
+    sell: 0.40
+  TALL_DRY_GRASS:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  TALL_GRASS:
+    category: nature
+    buy: 0.20
+    sell: 0.10
+  TORCHFLOWER:
+    category: nature
+    buy: 4.00
+    sell: 2.00
+  TUBE_CORAL:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  TUBE_CORAL_BLOCK:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  TUBE_CORAL_FAN:
+    category: nature
+    buy: 1.60
+    sell: 0.80
+  VINE:
+    category: nature
+    buy: 0.40
+    sell: 0.20
+  WET_SPONGE:
+    category: nature
+    buy: 20.00
+    sell: 10.00
+  WHITE_TULIP:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  WILDFLOWERS:
+    category: nature
+    buy: 0.60
+    sell: 0.30
+  WITHER_ROSE:
+    category: nature
+    buy: 4.00
+    sell: 2.00
 
-  # --------------------------- 农牧 ---------------------------
-  WHEAT:
+  # --------------------------- 农牧 · 作物 / 种子 / 畜产品 ---------------------------
+  ARMADILLO_SCUTE:
+    category: farm
+    buy: 4.00
+    sell: 2.00
+  BAKED_POTATO:
+    category: farm
+    buy: 0.30
+    sell: 0.15
+  BAMBOO:
+    category: farm
+    buy: 0.10
+    sell: 0.05
+    daily-sell: 8192
+  BEEHIVE:
+    category: farm
+    buy: 9.76
+    sell: 4.88
+  BEETROOT:
     category: farm
     buy: 0.30
     sell: 0.15
     daily-sell: 8192
+  BEETROOT_SEEDS:
+    category: farm
+    buy: 0.10
+    sell: 0.05
+  BLACK_WOOL:
+    category: farm
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 2048
+  BLUE_EGG:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  BLUE_WOOL:
+    category: farm
+    buy: 1.70
+    sell: 0.85
+    daily-sell: 2048
+  BONE_MEAL:
+    category: farm
+    buy: 0.22
+    sell: 0.11
+    daily-sell: 24576
+  BROWN_EGG:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  BROWN_MUSHROOM:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+    daily-sell: 2048
+  BROWN_MUSHROOM_BLOCK:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  BROWN_WOOL:
+    category: farm
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 2048
+  CACTUS:
+    category: farm
+    buy: 0.40
+    sell: 0.20
+    daily-sell: 8192
+  CACTUS_FLOWER:
+    category: farm
+    buy: 2.00
+    sell: 1.00
   CARROT:
     category: farm
     buy: 0.24
     sell: 0.12
     daily-sell: 8192
-  POTATO:
+  CARVED_PUMPKIN:
     category: farm
-    buy: 0.24
-    sell: 0.12
+    buy: 0.80
+    sell: 0.40
+  COCOA_BEANS:
+    category: farm
+    buy: 0.80
+    sell: 0.40
     daily-sell: 8192
-  BEETROOT:
+  COMPOSTER:
     category: farm
-    buy: 0.30
-    sell: 0.15
-  SUGAR_CANE:
+    buy: 0.70
+    sell: 0.35
+  CYAN_WOOL:
     category: farm
-    buy: 0.20
-    sell: 0.10
+    buy: 1.76
+    sell: 0.88
+    daily-sell: 2048
+  DRIED_KELP:
+    category: farm
+    buy: 0.14
+    sell: 0.07
+  DRIED_KELP_BLOCK:
+    category: farm
+    buy: 1.58
+    sell: 0.79
+  EGG:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+    daily-sell: 4096
+  GLOW_BERRIES:
+    category: farm
+    buy: 0.80
+    sell: 0.40
     daily-sell: 8192
-  BAMBOO:
+  GRAY_WOOL:
+    category: farm
+    buy: 1.76
+    sell: 0.88
+    daily-sell: 2048
+  GREEN_WOOL:
+    category: farm
+    buy: 1.38
+    sell: 0.69
+    daily-sell: 2048
+  HAY_BLOCK:
+    category: farm
+    buy: 3.38
+    sell: 1.69
+    daily-sell: 910
+  HONEYCOMB:
+    category: farm
+    buy: 2.40
+    sell: 1.20
+    daily-sell: 1024
+  HONEYCOMB_BLOCK:
+    category: farm
+    buy: 12.00
+    sell: 6.00
+  HONEY_BLOCK:
+    category: farm
+    buy: 15.00
+    sell: 7.50
+  JACK_O_LANTERN:
+    category: farm
+    buy: 1.50
+    sell: 0.75
+  KELP:
+    category: farm
+    buy: 0.10
+    sell: 0.05
+    daily-sell: 8192
+  LIGHT_BLUE_WOOL:
+    category: farm
+    buy: 1.58
+    sell: 0.79
+    daily-sell: 2048
+  LIGHT_GRAY_WOOL:
+    category: farm
+    buy: 1.58
+    sell: 0.79
+    daily-sell: 2048
+  LIME_WOOL:
+    category: farm
+    buy: 1.38
+    sell: 0.69
+    daily-sell: 2048
+  MAGENTA_WOOL:
+    category: farm
+    buy: 1.38
+    sell: 0.69
+    daily-sell: 2048
+  MELON:
+    category: farm
+    buy: 1.36
+    sell: 0.68
+  MELON_SEEDS:
     category: farm
     buy: 0.10
     sell: 0.05
@@ -326,98 +2820,137 @@ items:
     category: farm
     buy: 0.12
     sell: 0.06
+    daily-sell: 8192
+  MUSHROOM_STEM:
+    category: farm
+    buy: 0.60
+    sell: 0.30
+  ORANGE_WOOL:
+    category: farm
+    buy: 1.46
+    sell: 0.73
+    daily-sell: 2048
+  PINK_WOOL:
+    category: farm
+    buy: 1.28
+    sell: 0.64
+    daily-sell: 2048
+  PITCHER_POD:
+    category: farm
+    buy: 4.00
+    sell: 2.00
+  POISONOUS_POTATO:
+    category: farm
+    buy: 0.10
+    sell: 0.05
+  POTATO:
+    category: farm
+    buy: 0.24
+    sell: 0.12
+    daily-sell: 8192
   PUMPKIN:
     category: farm
     buy: 0.60
     sell: 0.30
-  COCOA_BEANS:
-    category: farm
-    buy: 0.80
-    sell: 0.40
-  NETHER_WART:
-    category: farm
-    buy: 0.60
-    sell: 0.30
-  CACTUS:
-    category: farm
-    buy: 0.40
-    sell: 0.20
-  KELP:
+    daily-sell: 8192
+  PUMPKIN_SEEDS:
     category: farm
     buy: 0.10
     sell: 0.05
-  SWEET_BERRIES:
+  PURPLE_WOOL:
     category: farm
-    buy: 0.30
-    sell: 0.15
-  GLOW_BERRIES:
-    category: farm
-    buy: 0.80
-    sell: 0.40
-  BROWN_MUSHROOM:
-    category: farm
-    buy: 0.60
-    sell: 0.30
+    buy: 1.66
+    sell: 0.83
+    daily-sell: 2048
   RED_MUSHROOM:
     category: farm
     buy: 0.60
     sell: 0.30
-  EGG:
+    daily-sell: 2048
+  RED_MUSHROOM_BLOCK:
     category: farm
     buy: 0.60
     sell: 0.30
-  HONEYCOMB:
+  RED_WOOL:
     category: farm
-    buy: 2.40
-    sell: 1.20
+    buy: 1.24
+    sell: 0.62
+    daily-sell: 2048
+  SUGAR_CANE:
+    category: farm
+    buy: 0.20
+    sell: 0.10
+    daily-sell: 8192
+  SWEET_BERRIES:
+    category: farm
+    buy: 0.30
+    sell: 0.15
+    daily-sell: 8192
+  TORCHFLOWER_SEEDS:
+    category: farm
+    buy: 4.00
+    sell: 2.00
+  TURTLE_EGG:
+    category: farm
+    buy: 4.00
+    sell: 2.00
+  TURTLE_SCUTE:
+    category: farm
+    buy: 6.00
+    sell: 3.00
+  WHEAT:
+    category: farm
+    buy: 0.30
+    sell: 0.15
+    daily-sell: 8192
+  WHEAT_SEEDS:
+    category: farm
+    buy: 0.10
+    sell: 0.05
   WHITE_WOOL:
     category: farm
     buy: 0.60
     sell: 0.30
-  LEATHER:
+    daily-sell: 2048
+  YELLOW_WOOL:
     category: farm
+    buy: 1.38
+    sell: 0.69
+    daily-sell: 2048
+
+  # --------------------------- 食物 · 生熟肉 / 主食 / 甜点 ---------------------------
+  APPLE:
+    category: food
     buy: 2.00
     sell: 1.00
-  FEATHER:
-    category: farm
-    buy: 0.40
-    sell: 0.20
-
-  # --------------------------- 食物 ---------------------------
   BEEF:
     category: food
     buy: 1.00
     sell: 0.50
-  PORKCHOP:
+    daily-sell: 2048
+  BEETROOT_SOUP:
+    category: food
+    buy: 2.38
+    sell: 1.19
+  BREAD:
     category: food
     buy: 1.00
     sell: 0.50
+  CAKE:
+    category: food
+    buy: 81.28
+    sell: 40.64
   CHICKEN:
     category: food
     buy: 0.80
     sell: 0.40
-  MUTTON:
-    category: food
-    buy: 0.80
-    sell: 0.40
-  RABBIT:
-    category: food
-    buy: 0.80
-    sell: 0.40
+    daily-sell: 2048
   COD:
     category: food
     buy: 0.80
     sell: 0.40
-  SALMON:
-    category: food
-    buy: 1.00
-    sell: 0.50
-  # 熔炼产物卖价低于原料买价，烤肉不能套利
+    daily-sell: 1024
   COOKED_BEEF:
-    category: food
-    buy: 1.60
-    sell: 0.80
-  COOKED_PORKCHOP:
     category: food
     buy: 1.60
     sell: 0.80
@@ -425,71 +2958,264 @@ items:
     category: food
     buy: 1.20
     sell: 0.60
-  BREAD:
+  COOKED_COD:
     category: food
     buy: 1.00
     sell: 0.50
-  APPLE:
+  COOKED_MUTTON:
     category: food
-    buy: 2.00
-    sell: 1.00
+    buy: 1.00
+    sell: 0.50
+  COOKED_PORKCHOP:
+    category: food
+    buy: 1.60
+    sell: 0.80
+  COOKED_RABBIT:
+    category: food
+    buy: 1.00
+    sell: 0.50
+  COOKED_SALMON:
+    category: food
+    buy: 1.26
+    sell: 0.63
+  COOKIE:
+    category: food
+    buy: 0.22
+    sell: 0.11
+  ENCHANTED_GOLDEN_APPLE:
+    category: food
+    buy: 2000.00
+    daily-buy: 8
   GOLDEN_APPLE:
     category: food
-    buy: 180.00
-    sell: 90.00
+    buy: 142.50
+    sell: 71.25
+    daily-sell: 128
   HONEY_BOTTLE:
     category: food
     buy: 3.00
     sell: 1.50
+    daily-sell: 1024
+  MILK_BUCKET:
+    category: food
+    buy: 21.00
+    sell: 10.50
+  MUSHROOM_STEW:
+    category: food
+    buy: 1.64
+    sell: 0.82
+  MUTTON:
+    category: food
+    buy: 0.80
+    sell: 0.40
+    daily-sell: 2048
+  POPPED_CHORUS_FRUIT:
+    category: food
+    buy: 2.50
+    sell: 1.25
+  PORKCHOP:
+    category: food
+    buy: 1.00
+    sell: 0.50
+    daily-sell: 2048
+  PUFFERFISH:
+    category: food
+    buy: 2.00
+    sell: 1.00
+  PUMPKIN_PIE:
+    category: food
+    buy: 1.84
+    sell: 0.92
+  RABBIT:
+    category: food
+    buy: 0.80
+    sell: 0.40
+    daily-sell: 512
+  RABBIT_STEW:
+    category: food
+    buy: 2.80
+    sell: 1.40
+  SALMON:
+    category: food
+    buy: 1.00
+    sell: 0.50
+    daily-sell: 1024
+  TROPICAL_FISH:
+    category: food
+    buy: 2.00
+    sell: 1.00
 
-  # --------------------------- 战利品 ---------------------------
-  ROTTEN_FLESH:
+  # --------------------------- 战利品 · 怪物掉落 / 结构宝藏 / 唱片 / 图案 ---------------------------
+  ANGLER_POTTERY_SHERD:
     category: mob
-    buy: 0.10
-    sell: 0.05
-    daily-sell: 8192
+    buy: 12.00
+    sell: 6.00
+  ARCHER_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  ARMS_UP_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  BLADE_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  BOLT_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
   BONE:
     category: mob
     buy: 0.50
     sell: 0.25
     daily-sell: 8192
-  STRING:
+  BONE_BLOCK:
     category: mob
-    buy: 0.60
-    sell: 0.30
-  SPIDER_EYE:
+    buy: 2.48
+    sell: 1.24
+  BORDURE_INDENTED_BANNER_PATTERN:
     category: mob
-    buy: 0.80
-    sell: 0.40
+    buy: 0.88
+    sell: 0.44
+  BREEZE_ROD:
+    category: mob
+    buy: 8.00
+    sell: 4.00
+    daily-sell: 1024
+  BREWER_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  BURN_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  COAST_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  CREEPER_BANNER_PATTERN:
+    category: mob
+    buy: 80.00
+    sell: 40.00
+  CREEPER_HEAD:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  DANGER_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  DISC_FRAGMENT_5:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  DRAGON_HEAD:
+    category: mob
+    buy: 400.00
+    sell: 200.00
+  DUNE_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  # 远古城市专属掉落，不可再生也无法养殖，定锚对齐凋灵骷髅头这一档
+  ECHO_SHARD:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+    # 先自己下一趟远古城市，之后才能买
+    unlock-by-sell: true
+  ENDER_PEARL:
+    category: mob
+    buy: 8.00
+    sell: 4.00
+    daily-sell: 512
+  EXPLORER_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  EYE_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  FEATHER:
+    category: mob
+    buy: 0.40
+    sell: 0.20
+    daily-sell: 8192
+  FIELD_MASONED_BANNER_PATTERN:
+    category: mob
+    buy: 2.00
+    sell: 1.00
+  FLOWER_BANNER_PATTERN:
+    category: mob
+    buy: 1.14
+    sell: 0.57
+  FLOW_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  FLOW_BANNER_PATTERN:
+    category: mob
+    buy: 20.00
+    sell: 10.00
+  FLOW_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  FRIEND_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  GLOBE_BANNER_PATTERN:
+    category: mob
+    buy: 20.00
+    sell: 10.00
+  GLOW_INK_SAC:
+    category: mob
+    buy: 2.40
+    sell: 1.20
+    daily-sell: 512
   GUNPOWDER:
     category: mob
     buy: 2.00
     sell: 1.00
     daily-sell: 2048
     dynamic: { enabled: true, step-bp: 2 }
-  SLIME_BALL:
+  GUSTER_BANNER_PATTERN:
     category: mob
-    buy: 2.00
-    sell: 1.00
-  MAGMA_CREAM:
+    buy: 40.00
+    sell: 20.00
+  GUSTER_POTTERY_SHERD:
     category: mob
-    buy: 4.40
-    sell: 2.20
-  BLAZE_ROD:
+    buy: 12.00
+    sell: 6.00
+  HEARTBREAK_POTTERY_SHERD:
     category: mob
-    buy: 6.00
-    sell: 3.00
-    daily-sell: 1024
-  ENDER_PEARL:
+    buy: 12.00
+    sell: 6.00
+  HEART_OF_THE_SEA:
     category: mob
-    buy: 8.00
-    sell: 4.00
-    daily-sell: 512
-  GHAST_TEAR:
+    buy: 400.00
+    sell: 200.00
+    # 先自己挖一次沉船/埋宝，之后才能买
+    unlock-by-sell: true
+  HEART_POTTERY_SHERD:
     category: mob
-    buy: 16.00
-    sell: 8.00
-  PHANTOM_MEMBRANE:
+    buy: 12.00
+    sell: 6.00
+  HEAVY_CORE:
+    category: mob
+    buy: 400.00
+    sell: 200.00
+    daily-sell: 64
+  HOST_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  HOWL_POTTERY_SHERD:
     category: mob
     buy: 12.00
     sell: 6.00
@@ -497,43 +3223,495 @@ items:
     category: mob
     buy: 0.80
     sell: 0.40
-  GLOW_INK_SAC:
+    daily-sell: 2048
+  LEATHER:
     category: mob
-    buy: 2.40
-    sell: 1.20
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 2048
+  MINER_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  # 附魔金苹果合成，无自然产出且不可再生，手工定锚在图案顶价
+  MOJANG_BANNER_PATTERN:
+    category: mob
+    buy: 200.00
+    sell: 100.00
+  MOURNER_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  MUSIC_DISC_11:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_13:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_5:
+    category: mob
+    buy: 140.00
+    sell: 70.00
+  MUSIC_DISC_BLOCKS:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_BOUNCE:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_CAT:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_CHIRP:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_CREATOR:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  MUSIC_DISC_CREATOR_MUSIC_BOX:
+    category: mob
+    buy: 200.00
+    sell: 100.00
+  MUSIC_DISC_FAR:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_LAVA_CHICKEN:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_MALL:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_MELLOHI:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_OTHERSIDE:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  MUSIC_DISC_PIGSTEP:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  MUSIC_DISC_PRECIPICE:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  MUSIC_DISC_RELIC:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  MUSIC_DISC_STAL:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_STRAD:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_TEARS:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_WAIT:
+    category: mob
+    buy: 30.00
+    sell: 15.00
+  MUSIC_DISC_WARD:
+    category: mob
+    buy: 30.00
+    sell: 15.00
   NAUTILUS_SHELL:
     category: mob
     buy: 30.00
     sell: 15.00
-  HEART_OF_THE_SEA:
+  NETHERITE_UPGRADE_SMITHING_TEMPLATE:
     category: mob
-    buy: 400.00
-    sell: 200.00
-  SHULKER_SHELL:
-    category: mob
-    buy: 80.00
-    sell: 40.00
-    daily-sell: 128
-  TOTEM_OF_UNDYING:
-    category: mob
-    buy: 600.00
-    sell: 300.00
-    daily-sell: 64
+    buy: 200.00
+    sell: 100.00
   NETHER_STAR:
     category: mob
     buy: 800.00
     sell: 400.00
+    # 先自己召唤一次凋灵，之后才能买
+    unlock-by-sell: true
     daily-sell: 16
-  DRAGON_BREATH:
+  OMINOUS_TRIAL_KEY:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+    daily-sell: 256
+  PIGLIN_BANNER_PATTERN:
     category: mob
     buy: 20.00
     sell: 10.00
+  PIGLIN_HEAD:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  PLENTY_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  PRIZE_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  RABBIT_HIDE:
+    category: mob
+    buy: 1.20
+    sell: 0.60
+  RAISER_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  RESIN_CLUMP:
+    category: mob
+    buy: 2.00
+    sell: 1.00
+  RIB_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 120.00
+    sell: 60.00
+  ROTTEN_FLESH:
+    category: mob
+    buy: 0.10
+    sell: 0.05
+    daily-sell: 8192
+  SCRAPE_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  SHEAF_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  SHELTER_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  SHULKER_SHELL:
+    category: mob
+    buy: 80.00
+    sell: 40.00
+    # 先自己去末地城打一只潜影贝，之后才能买
+    unlock-by-sell: true
+    daily-sell: 128
+  SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 400.00
+    sell: 200.00
+  SKELETON_SKULL:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  SKULL_BANNER_PATTERN:
+    category: mob
+    buy: 160.00
+    sell: 80.00
+  SKULL_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  SLIME_BALL:
+    category: mob
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 2048
+  SNIFFER_EGG:
+    category: mob
+    buy: 60.00
+    sell: 30.00
+  SNORT_POTTERY_SHERD:
+    category: mob
+    buy: 12.00
+    sell: 6.00
+  SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 120.00
+    sell: 60.00
+  STRING:
+    category: mob
+    buy: 0.60
+    sell: 0.30
+    daily-sell: 8192
+  TIDE_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  TOTEM_OF_UNDYING:
+    category: mob
+    buy: 600.00
+    sell: 300.00
+    # 先自己打一次唤魔者，之后才能买
+    unlock-by-sell: true
+    daily-sell: 64
+  TRIAL_KEY:
+    category: mob
+    buy: 20.00
+    sell: 10.00
+    daily-sell: 512
+  VEX_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 120.00
+    sell: 60.00
+  WARD_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 120.00
+    sell: 60.00
+  WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  WILD_ARMOR_TRIM_SMITHING_TEMPLATE:
+    category: mob
+    buy: 40.00
+    sell: 20.00
+  WITHER_SKELETON_SKULL:
+    category: mob
+    buy: 120.00
+    sell: 60.00
+    # 先自己去下界要塞打一次，之后才能买
+    unlock-by-sell: true
+  ZOMBIE_HEAD:
+    category: mob
+    buy: 60.00
+    sell: 30.00
 
-  # --------------------------- 下界 ---------------------------
+  # --------------------------- 下界 · 下界岩族 / 黑石 / 菌类 ---------------------------
+  BASALT:
+    category: nether
+    buy: 0.10
+    sell: 0.05
+  BLACKSTONE:
+    category: nether
+    buy: 0.10
+    sell: 0.05
+  BLACKSTONE_SLAB:
+    category: nether
+    buy: 0.08
+    sell: 0.04
+  BLACKSTONE_STAIRS:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  BLACKSTONE_WALL:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  CHISELED_NETHER_BRICKS:
+    category: nether
+    buy: 0.26
+    sell: 0.13
+  CHISELED_POLISHED_BLACKSTONE:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  CHISELED_QUARTZ_BLOCK:
+    category: nether
+    buy: 12.50
+    sell: 6.25
+  CRACKED_NETHER_BRICKS:
+    category: nether
+    buy: 0.26
+    sell: 0.13
+  CRIMSON_FUNGUS:
+    category: nether
+    buy: 0.60
+    sell: 0.30
+  CRIMSON_NYLIUM:
+    category: nether
+    buy: 0.40
+    sell: 0.20
+  CRIMSON_ROOTS:
+    category: nether
+    buy: 0.40
+    sell: 0.20
+  CRYING_OBSIDIAN:
+    category: nether
+    buy: 8.00
+    sell: 4.00
+  GILDED_BLACKSTONE:
+    category: nether
+    buy: 10.00
+    sell: 5.00
+  GLOWSTONE:
+    category: nether
+    buy: 1.60
+    sell: 0.80
+  MAGMA_BLOCK:
+    category: nether
+    buy: 1.00
+    sell: 0.50
   NETHERRACK:
     category: nether
     buy: 0.02
     sell: 0.01
+  NETHER_BRICK:
+    category: nether
+    buy: 0.04
+    sell: 0.02
+  NETHER_BRICKS:
+    category: nether
+    buy: 0.20
+    sell: 0.10
+  NETHER_BRICK_FENCE:
+    category: nether
+    buy: 0.20
+    sell: 0.10
+  NETHER_BRICK_SLAB:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  NETHER_BRICK_STAIRS:
+    category: nether
+    buy: 0.26
+    sell: 0.13
+  NETHER_BRICK_WALL:
+    category: nether
+    buy: 0.26
+    sell: 0.13
+  NETHER_SPROUTS:
+    category: nether
+    buy: 0.40
+    sell: 0.20
+  NETHER_WART_BLOCK:
+    category: nether
+    buy: 5.40
+    sell: 2.70
+  OCHRE_FROGLIGHT:
+    category: nether
+    buy: 8.00
+    sell: 4.00
+  PEARLESCENT_FROGLIGHT:
+    category: nether
+    buy: 8.00
+    sell: 4.00
+  POLISHED_BASALT:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  POLISHED_BLACKSTONE:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  POLISHED_BLACKSTONE_BRICKS:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  POLISHED_BLACKSTONE_BRICK_SLAB:
+    category: nether
+    buy: 0.08
+    sell: 0.04
+  POLISHED_BLACKSTONE_BRICK_STAIRS:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  POLISHED_BLACKSTONE_BRICK_WALL:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  POLISHED_BLACKSTONE_SLAB:
+    category: nether
+    buy: 0.08
+    sell: 0.04
+  POLISHED_BLACKSTONE_STAIRS:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  POLISHED_BLACKSTONE_WALL:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  QUARTZ_BLOCK:
+    category: nether
+    buy: 10.00
+    sell: 5.00
+  QUARTZ_BRICKS:
+    category: nether
+    buy: 12.50
+    sell: 6.25
+  QUARTZ_PILLAR:
+    category: nether
+    buy: 12.50
+    sell: 6.25
+  QUARTZ_SLAB:
+    category: nether
+    buy: 6.26
+    sell: 3.13
+  QUARTZ_STAIRS:
+    category: nether
+    buy: 12.50
+    sell: 6.25
+  RED_NETHER_BRICKS:
+    category: nether
+    buy: 1.60
+    sell: 0.80
+  RED_NETHER_BRICK_SLAB:
+    category: nether
+    buy: 1.00
+    sell: 0.50
+  RED_NETHER_BRICK_STAIRS:
+    category: nether
+    buy: 2.00
+    sell: 1.00
+  RED_NETHER_BRICK_WALL:
+    category: nether
+    buy: 2.00
+    sell: 1.00
+  RESPAWN_ANCHOR:
+    category: nether
+    buy: 66.00
+    sell: 33.00
+  SHROOMLIGHT:
+    category: nether
+    buy: 3.00
+    sell: 1.50
+  SMOOTH_BASALT:
+    category: nether
+    buy: 0.14
+    sell: 0.07
+  SMOOTH_QUARTZ:
+    category: nether
+    buy: 12.50
+    sell: 6.25
+  SMOOTH_QUARTZ_SLAB:
+    category: nether
+    buy: 7.82
+    sell: 3.91
+  SMOOTH_QUARTZ_STAIRS:
+    category: nether
+    buy: 15.64
+    sell: 7.82
+  SOUL_CAMPFIRE:
+    category: nether
+    buy: 3.40
+    sell: 1.70
+  SOUL_LANTERN:
+    category: nether
+    buy: 8.98
+    sell: 4.49
   SOUL_SAND:
     category: nether
     buy: 0.20
@@ -542,84 +3720,2120 @@ items:
     category: nether
     buy: 0.20
     sell: 0.10
-  MAGMA_BLOCK:
+  SOUL_TORCH:
     category: nether
-    buy: 1.00
-    sell: 0.50
-  BLACKSTONE:
-    category: nether
-    buy: 0.10
-    sell: 0.05
-  BASALT:
-    category: nether
-    buy: 0.10
-    sell: 0.05
-  GILDED_BLACKSTONE:
-    category: nether
-    buy: 10.00
-    sell: 5.00
-  CRYING_OBSIDIAN:
-    category: nether
-    buy: 8.00
-    sell: 4.00
-  CRIMSON_STEM:
-    category: nether
-    buy: 0.80
-    sell: 0.40
-  WARPED_STEM:
-    category: nether
-    buy: 0.80
-    sell: 0.40
-  SHROOMLIGHT:
-    category: nether
-    buy: 3.00
-    sell: 1.50
+    buy: 0.46
+    sell: 0.23
   TWISTING_VINES:
     category: nether
     buy: 0.40
     sell: 0.20
+  VERDANT_FROGLIGHT:
+    category: nether
+    buy: 8.00
+    sell: 4.00
+  WARPED_FUNGUS:
+    category: nether
+    buy: 0.60
+    sell: 0.30
+  WARPED_NYLIUM:
+    category: nether
+    buy: 0.40
+    sell: 0.20
+  WARPED_ROOTS:
+    category: nether
+    buy: 0.40
+    sell: 0.20
+  WARPED_WART_BLOCK:
+    category: nether
+    buy: 5.40
+    sell: 2.70
+  WEEPING_VINES:
+    category: nether
+    buy: 0.40
+    sell: 0.20
 
-  # --------------------------- 杂项 ---------------------------
-  NAME_TAG:
-    category: misc
-    buy: 40.00
-    sell: 20.00
-  # 皮革 ×3 + 铁锭 ×1 = 材料买入 12.00，卖出上限即 12.00 的一半（守住 buy = 2 × sell）
-  SADDLE:
-    category: misc
-    buy: 12.00
-    sell: 6.00
-  # 线 ×5 → 拴绳 ×2：材料买入 3.00，两条拴绳卖出合计 2.00，合成必亏
-  LEAD:
-    category: misc
+  # --------------------------- 末地 · 末地石 / 紫珀 / 潜影盒 / 龙类 ---------------------------
+  BLACK_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  BLUE_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  BROWN_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  CHORUS_FLOWER:
+    category: end
     buy: 2.00
     sell: 1.00
+  CHORUS_FRUIT:
+    category: end
+    buy: 2.00
+    sell: 1.00
+    daily-sell: 4096
+  CHORUS_PLANT:
+    category: end
+    buy: 2.00
+    sell: 1.00
+  CYAN_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  ENDER_CHEST:
+    category: end
+    buy: 48.38
+    sell: 24.19
+  ENDER_EYE:
+    category: end
+    buy: 14.70
+    sell: 7.35
+  END_CRYSTAL:
+    category: end
+    buy: 39.08
+    sell: 19.54
+  END_ROD:
+    category: end
+    buy: 2.66
+    sell: 1.33
+  END_STONE:
+    category: end
+    buy: 0.20
+    sell: 0.10
+  END_STONE_BRICKS:
+    category: end
+    buy: 0.26
+    sell: 0.13
+  END_STONE_BRICK_SLAB:
+    category: end
+    buy: 0.14
+    sell: 0.07
+  END_STONE_BRICK_STAIRS:
+    category: end
+    buy: 0.26
+    sell: 0.13
+  END_STONE_BRICK_WALL:
+    category: end
+    buy: 0.26
+    sell: 0.13
+  GRAY_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  GREEN_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  LIGHT_BLUE_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  LIGHT_GRAY_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  LIME_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  MAGENTA_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  ORANGE_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  PINK_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  PURPLE_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  PURPUR_BLOCK:
+    category: end
+    buy: 3.14
+    sell: 1.57
+  PURPUR_PILLAR:
+    category: end
+    buy: 3.94
+    sell: 1.97
+  PURPUR_SLAB:
+    category: end
+    buy: 1.98
+    sell: 0.99
+  PURPUR_STAIRS:
+    category: end
+    buy: 3.94
+    sell: 1.97
+  RED_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  SHULKER_BOX:
+    category: end
+    buy: 201.26
+    sell: 100.63
+    daily-sell: 64
+  WHITE_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+  YELLOW_SHULKER_BOX:
+    category: end
+    buy: 211.34
+    sell: 105.67
+    daily-sell: 4
+
+  # --------------------------- 红石 · 元件 / 活塞 / 铁轨矿车 / 铜灯 ---------------------------
+  ACTIVATOR_RAIL:
+    category: redstone
+    buy: 7.80
+    sell: 3.90
+  CALIBRATED_SCULK_SENSOR:
+    category: redstone
+    buy: 25.00
+    sell: 12.50
+  CHEST_MINECART:
+    category: redstone
+    buy: 48.14
+    sell: 24.07
+  COMPARATOR:
+    category: redstone
+    buy: 7.54
+    sell: 3.77
+  COPPER_BARS:
+    category: redstone
+    buy: 0.94
+    sell: 0.47
+  COPPER_BULB:
+    category: redstone
+    buy: 19.08
+    sell: 9.54
+  COPPER_DOOR:
+    category: redstone
+    buy: 5.00
+    sell: 2.50
+  COPPER_GOLEM_STATUE:
+    category: redstone
+    buy: 24.00
+    sell: 12.00
+  COPPER_TRAPDOOR:
+    category: redstone
+    buy: 10.00
+    sell: 5.00
+  CRAFTER:
+    category: redstone
+    buy: 42.44
+    sell: 21.22
+  DAYLIGHT_DETECTOR:
+    category: redstone
+    buy: 8.10
+    sell: 4.05
+  DETECTOR_RAIL:
+    category: redstone
+    buy: 7.74
+    sell: 3.87
+  DISPENSER:
+    category: redstone
+    buy: 4.44
+    sell: 2.22
+  DROPPER:
+    category: redstone
+    buy: 1.44
+    sell: 0.72
+  EXPOSED_COPPER_BARS:
+    category: redstone
+    buy: 0.94
+    sell: 0.47
+  EXPOSED_COPPER_BULB:
+    category: redstone
+    buy: 19.08
+    sell: 9.54
+  EXPOSED_COPPER_DOOR:
+    category: redstone
+    buy: 5.00
+    sell: 2.50
+  EXPOSED_COPPER_GOLEM_STATUE:
+    category: redstone
+    buy: 24.00
+    sell: 12.00
+  EXPOSED_COPPER_TRAPDOOR:
+    category: redstone
+    buy: 10.00
+    sell: 5.00
+  EXPOSED_LIGHTNING_ROD:
+    category: redstone
+    buy: 7.50
+    sell: 3.75
+  FURNACE_MINECART:
+    category: redstone
+    buy: 47.14
+    sell: 23.57
+  HEAVY_WEIGHTED_PRESSURE_PLATE:
+    category: redstone
+    buy: 15.00
+    sell: 7.50
+  HOPPER:
+    category: redstone
+    buy: 38.76
+    sell: 19.38
+  HOPPER_MINECART:
+    category: redstone
+    buy: 95.34
+    sell: 47.67
+  IRON_BARS:
+    category: redstone
+    buy: 2.82
+    sell: 1.41
+  IRON_DOOR:
+    category: redstone
+    buy: 15.00
+    sell: 7.50
+  IRON_TRAPDOOR:
+    category: redstone
+    buy: 30.00
+    sell: 15.00
+  LEVER:
+    category: redstone
+    buy: 0.08
+    sell: 0.04
+  LIGHTNING_ROD:
+    category: redstone
+    buy: 7.50
+    sell: 3.75
+  LIGHT_WEIGHTED_PRESSURE_PLATE:
+    category: redstone
+    buy: 35.00
+    sell: 17.50
+  MINECART:
+    category: redstone
+    buy: 37.50
+    sell: 18.75
+  NOTE_BLOCK:
+    category: redstone
+    buy: 2.26
+    sell: 1.13
+  OBSERVER:
+    category: redstone
+    buy: 5.16
+    sell: 2.58
+  OXIDIZED_COPPER_BARS:
+    category: redstone
+    buy: 0.94
+    sell: 0.47
+  OXIDIZED_COPPER_BULB:
+    category: redstone
+    buy: 19.08
+    sell: 9.54
+  OXIDIZED_COPPER_DOOR:
+    category: redstone
+    buy: 5.00
+    sell: 2.50
+  OXIDIZED_COPPER_GOLEM_STATUE:
+    category: redstone
+    buy: 24.00
+    sell: 12.00
+  OXIDIZED_COPPER_TRAPDOOR:
+    category: redstone
+    buy: 10.00
+    sell: 5.00
+  OXIDIZED_LIGHTNING_ROD:
+    category: redstone
+    buy: 7.50
+    sell: 3.75
+  PISTON:
+    category: redstone
+    buy: 9.24
+    sell: 4.62
+  POLISHED_BLACKSTONE_BUTTON:
+    category: redstone
+    buy: 0.18
+    sell: 0.09
+  POLISHED_BLACKSTONE_PRESSURE_PLATE:
+    category: redstone
+    buy: 0.36
+    sell: 0.18
+  POWERED_RAIL:
+    category: redstone
+    buy: 17.72
+    sell: 8.86
+  RAIL:
+    category: redstone
+    buy: 2.82
+    sell: 1.41
+  REDSTONE:
+    category: redstone
+    buy: 1.00
+    sell: 0.50
+    daily-sell: 4096
+  REDSTONE_BLOCK:
+    category: redstone
+    buy: 9.00
+    sell: 4.50
+    daily-sell: 455
+  REDSTONE_LAMP:
+    category: redstone
+    buy: 7.00
+    sell: 3.50
+  REDSTONE_TORCH:
+    category: redstone
+    buy: 1.30
+    sell: 0.65
+  REPEATER:
+    category: redstone
+    buy: 4.66
+    sell: 2.33
+  SCULK_SENSOR:
+    category: redstone
+    buy: 8.00
+    sell: 4.00
+    daily-sell: 512
+  SLIME_BLOCK:
+    category: redstone
+    buy: 22.50
+    sell: 11.25
+  STICKY_PISTON:
+    category: redstone
+    buy: 14.06
+    sell: 7.03
+  STONE_BUTTON:
+    category: redstone
+    buy: 0.06
+    sell: 0.03
+  STONE_PRESSURE_PLATE:
+    category: redstone
+    buy: 0.10
+    sell: 0.05
+  TARGET:
+    category: redstone
+    buy: 9.24
+    sell: 4.62
+  TNT:
+    category: redstone
+    buy: 12.80
+    sell: 6.40
+    daily-sell: 409
+  TNT_MINECART:
+    category: redstone
+    buy: 62.88
+    sell: 31.44
+  TRAPPED_CHEST:
+    category: redstone
+    buy: 6.06
+    sell: 3.03
+  TRIPWIRE_HOOK:
+    category: redstone
+    buy: 3.84
+    sell: 1.92
+  WAXED_COPPER_BARS:
+    category: redstone
+    buy: 4.18
+    sell: 2.09
+  WAXED_COPPER_BULB:
+    category: redstone
+    buy: 26.10
+    sell: 13.05
+  WAXED_COPPER_DOOR:
+    category: redstone
+    buy: 9.26
+    sell: 4.63
+  WAXED_COPPER_GOLEM_STATUE:
+    category: redstone
+    buy: 33.00
+    sell: 16.50
+  WAXED_COPPER_TRAPDOOR:
+    category: redstone
+    buy: 15.50
+    sell: 7.75
+  WAXED_EXPOSED_COPPER_BARS:
+    category: redstone
+    buy: 4.18
+    sell: 2.09
+  WAXED_EXPOSED_COPPER_BULB:
+    category: redstone
+    buy: 26.10
+    sell: 13.05
+  WAXED_EXPOSED_COPPER_DOOR:
+    category: redstone
+    buy: 9.26
+    sell: 4.63
+  WAXED_EXPOSED_COPPER_GOLEM_STATUE:
+    category: redstone
+    buy: 33.00
+    sell: 16.50
+  WAXED_EXPOSED_COPPER_TRAPDOOR:
+    category: redstone
+    buy: 15.50
+    sell: 7.75
+  WAXED_EXPOSED_LIGHTNING_ROD:
+    category: redstone
+    buy: 12.38
+    sell: 6.19
+  WAXED_LIGHTNING_ROD:
+    category: redstone
+    buy: 12.38
+    sell: 6.19
+  WAXED_OXIDIZED_COPPER_BARS:
+    category: redstone
+    buy: 4.18
+    sell: 2.09
+  WAXED_OXIDIZED_COPPER_BULB:
+    category: redstone
+    buy: 26.10
+    sell: 13.05
+  WAXED_OXIDIZED_COPPER_DOOR:
+    category: redstone
+    buy: 9.26
+    sell: 4.63
+  WAXED_OXIDIZED_COPPER_GOLEM_STATUE:
+    category: redstone
+    buy: 33.00
+    sell: 16.50
+  WAXED_OXIDIZED_COPPER_TRAPDOOR:
+    category: redstone
+    buy: 15.50
+    sell: 7.75
+  WAXED_OXIDIZED_LIGHTNING_ROD:
+    category: redstone
+    buy: 12.38
+    sell: 6.19
+  WAXED_WEATHERED_COPPER_BARS:
+    category: redstone
+    buy: 4.18
+    sell: 2.09
+  WAXED_WEATHERED_COPPER_BULB:
+    category: redstone
+    buy: 26.10
+    sell: 13.05
+  WAXED_WEATHERED_COPPER_DOOR:
+    category: redstone
+    buy: 9.26
+    sell: 4.63
+  WAXED_WEATHERED_COPPER_GOLEM_STATUE:
+    category: redstone
+    buy: 33.00
+    sell: 16.50
+  WAXED_WEATHERED_COPPER_TRAPDOOR:
+    category: redstone
+    buy: 15.50
+    sell: 7.75
+  WAXED_WEATHERED_LIGHTNING_ROD:
+    category: redstone
+    buy: 12.38
+    sell: 6.19
+  WEATHERED_COPPER_BARS:
+    category: redstone
+    buy: 0.94
+    sell: 0.47
+  WEATHERED_COPPER_BULB:
+    category: redstone
+    buy: 19.08
+    sell: 9.54
+  WEATHERED_COPPER_DOOR:
+    category: redstone
+    buy: 5.00
+    sell: 2.50
+  WEATHERED_COPPER_GOLEM_STATUE:
+    category: redstone
+    buy: 24.00
+    sell: 12.00
+  WEATHERED_COPPER_TRAPDOOR:
+    category: redstone
+    buy: 10.00
+    sell: 5.00
+  WEATHERED_LIGHTNING_ROD:
+    category: redstone
+    buy: 7.50
+    sell: 3.75
+
+  # --------------------------- 装饰 · 羊毛地毯床 / 玻璃 / 混凝土陶瓦 / 灯饰 ---------------------------
+  ARMOR_STAND:
+    category: deco
+    buy: 0.36
+    sell: 0.18
+  BEACON:
+    category: deco
+    buy: 1011.76
+    sell: 505.88
+    daily-sell: 16
+  BELL:
+    category: deco
+    buy: 40.00
+    sell: 20.00
+  BLACK_BANNER:
+    category: deco
+    buy: 15.06
+    sell: 7.53
+  BLACK_BED:
+    category: deco
+    buy: 4.56
+    sell: 2.28
+  BLACK_CANDLE:
+    category: deco
+    buy: 5.96
+    sell: 2.98
+  BLACK_CARPET:
+    category: deco
+    buy: 1.68
+    sell: 0.84
+  BLACK_CONCRETE:
+    category: deco
+    buy: 0.46
+    sell: 0.23
+  BLACK_CONCRETE_POWDER:
+    category: deco
+    buy: 0.36
+    sell: 0.18
+  BLACK_DYE:
+    category: deco
+    buy: 1.00
+    sell: 0.50
+  BLACK_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.78
+    sell: 0.89
+  BLACK_STAINED_GLASS:
+    category: deco
+    buy: 0.26
+    sell: 0.13
+  BLACK_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.14
+    sell: 0.07
+  BLACK_TERRACOTTA:
+    category: deco
+    buy: 1.42
+    sell: 0.71
+  BLUE_BANNER:
+    category: deco
+    buy: 12.80
+    sell: 6.40
+  BLUE_BED:
+    category: deco
+    buy: 4.26
+    sell: 2.13
+  BLUE_CANDLE:
+    category: deco
+    buy: 5.66
+    sell: 2.83
+  BLUE_CARPET:
+    category: deco
+    buy: 1.42
+    sell: 0.71
+  BLUE_CONCRETE:
+    category: deco
+    buy: 0.40
+    sell: 0.20
+  BLUE_CONCRETE_POWDER:
+    category: deco
+    buy: 0.32
+    sell: 0.16
+  BLUE_DYE:
+    category: deco
+    buy: 0.76
+    sell: 0.38
+  BLUE_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.74
+    sell: 0.87
+  BLUE_STAINED_GLASS:
+    category: deco
+    buy: 0.22
+    sell: 0.11
+  BLUE_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.12
+    sell: 0.06
+  BLUE_TERRACOTTA:
+    category: deco
+    buy: 1.38
+    sell: 0.69
+  BROWN_BANNER:
+    category: deco
+    buy: 15.06
+    sell: 7.53
+  BROWN_BED:
+    category: deco
+    buy: 4.56
+    sell: 2.28
+  BROWN_CANDLE:
+    category: deco
+    buy: 5.96
+    sell: 2.98
+  BROWN_CARPET:
+    category: deco
+    buy: 1.68
+    sell: 0.84
+  BROWN_CONCRETE:
+    category: deco
+    buy: 0.46
+    sell: 0.23
+  BROWN_CONCRETE_POWDER:
+    category: deco
+    buy: 0.36
+    sell: 0.18
+  BROWN_DYE:
+    category: deco
+    buy: 1.00
+    sell: 0.50
+  BROWN_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.78
+    sell: 0.89
+  BROWN_STAINED_GLASS:
+    category: deco
+    buy: 0.26
+    sell: 0.13
+  BROWN_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.14
+    sell: 0.07
+  BROWN_TERRACOTTA:
+    category: deco
+    buy: 1.42
+    sell: 0.71
+  CAMPFIRE:
+    category: deco
+    buy: 4.66
+    sell: 2.33
+  CANDLE:
+    category: deco
+    buy: 3.76
+    sell: 1.88
+  COBWEB:
+    category: deco
+    buy: 4.00
+    sell: 2.00
+  CONDUIT:
+    category: deco
+    buy: 800.00
+    sell: 400.00
+  COPPER_CHAIN:
+    category: deco
+    buy: 3.20
+    sell: 1.60
+  COPPER_CHEST:
+    category: deco
+    buy: 21.26
+    sell: 10.63
+  COPPER_LANTERN:
+    category: deco
+    buy: 3.40
+    sell: 1.70
+  COPPER_TORCH:
+    category: deco
+    buy: 0.48
+    sell: 0.24
+  CYAN_BANNER:
+    category: deco
+    buy: 13.26
+    sell: 6.63
+  CYAN_BED:
+    category: deco
+    buy: 4.30
+    sell: 2.15
+  CYAN_CANDLE:
+    category: deco
+    buy: 5.70
+    sell: 2.85
+  CYAN_CARPET:
+    category: deco
+    buy: 1.48
+    sell: 0.74
+  CYAN_CONCRETE:
+    category: deco
+    buy: 0.40
+    sell: 0.20
+  CYAN_CONCRETE_POWDER:
+    category: deco
+    buy: 0.32
+    sell: 0.16
+  CYAN_DYE:
+    category: deco
+    buy: 0.80
+    sell: 0.40
+  CYAN_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.74
+    sell: 0.87
+  CYAN_STAINED_GLASS:
+    category: deco
+    buy: 0.24
+    sell: 0.12
+  CYAN_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.12
+    sell: 0.06
+  CYAN_TERRACOTTA:
+    category: deco
+    buy: 1.38
+    sell: 0.69
+  EXPOSED_COPPER_CHAIN:
+    category: deco
+    buy: 3.20
+    sell: 1.60
+  EXPOSED_COPPER_CHEST:
+    category: deco
+    buy: 21.26
+    sell: 10.63
+  EXPOSED_COPPER_LANTERN:
+    category: deco
+    buy: 3.40
+    sell: 1.70
+  FLOWER_POT:
+    category: deco
+    buy: 0.98
+    sell: 0.49
+  GLASS:
+    category: deco
+    buy: 0.08
+    sell: 0.04
+  GLASS_PANE:
+    category: deco
+    buy: 0.04
+    sell: 0.02
+  GLOW_ITEM_FRAME:
+    category: deco
+    buy: 6.64
+    sell: 3.32
+  GRAY_BANNER:
+    category: deco
+    buy: 13.26
+    sell: 6.63
+  GRAY_BED:
+    category: deco
+    buy: 4.30
+    sell: 2.15
+  GRAY_CANDLE:
+    category: deco
+    buy: 5.70
+    sell: 2.85
+  GRAY_CARPET:
+    category: deco
+    buy: 1.48
+    sell: 0.74
+  GRAY_CONCRETE:
+    category: deco
+    buy: 0.40
+    sell: 0.20
+  GRAY_CONCRETE_POWDER:
+    category: deco
+    buy: 0.32
+    sell: 0.16
+  GRAY_DYE:
+    category: deco
+    buy: 0.80
+    sell: 0.40
+  GRAY_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.74
+    sell: 0.87
+  GRAY_STAINED_GLASS:
+    category: deco
+    buy: 0.24
+    sell: 0.12
+  GRAY_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.12
+    sell: 0.06
+  GRAY_TERRACOTTA:
+    category: deco
+    buy: 1.38
+    sell: 0.69
+  GREEN_BANNER:
+    category: deco
+    buy: 10.40
+    sell: 5.20
+  GREEN_BED:
+    category: deco
+    buy: 3.94
+    sell: 1.97
+  GREEN_CANDLE:
+    category: deco
+    buy: 5.34
+    sell: 2.67
+  GREEN_CARPET:
+    category: deco
+    buy: 1.16
+    sell: 0.58
+  GREEN_CONCRETE:
+    category: deco
+    buy: 0.36
+    sell: 0.18
+  GREEN_CONCRETE_POWDER:
+    category: deco
+    buy: 0.28
+    sell: 0.14
+  GREEN_DYE:
+    category: deco
+    buy: 0.50
+    sell: 0.25
+  GREEN_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.68
+    sell: 0.84
+  GREEN_STAINED_GLASS:
+    category: deco
+    buy: 0.18
+    sell: 0.09
+  GREEN_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.10
+    sell: 0.05
+  GREEN_TERRACOTTA:
+    category: deco
+    buy: 1.34
+    sell: 0.67
+  IRON_CHAIN:
+    category: deco
+    buy: 9.60
+    sell: 4.80
+  ITEM_FRAME:
+    category: deco
+    buy: 2.90
+    sell: 1.45
+  LANTERN:
+    category: deco
+    buy: 8.90
+    sell: 4.45
+  LIGHT_BLUE_BANNER:
+    category: deco
+    buy: 11.90
+    sell: 5.95
+  LIGHT_BLUE_BED:
+    category: deco
+    buy: 4.14
+    sell: 2.07
+  LIGHT_BLUE_CANDLE:
+    category: deco
+    buy: 5.54
+    sell: 2.77
+  LIGHT_BLUE_CARPET:
+    category: deco
+    buy: 1.32
+    sell: 0.66
+  LIGHT_BLUE_CONCRETE:
+    category: deco
+    buy: 0.38
+    sell: 0.19
+  LIGHT_BLUE_CONCRETE_POWDER:
+    category: deco
+    buy: 0.30
+    sell: 0.15
+  LIGHT_BLUE_DYE:
+    category: deco
+    buy: 0.66
+    sell: 0.33
+  LIGHT_BLUE_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.70
+    sell: 0.85
+  LIGHT_BLUE_STAINED_GLASS:
+    category: deco
+    buy: 0.22
+    sell: 0.11
+  LIGHT_BLUE_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.12
+    sell: 0.06
+  LIGHT_BLUE_TERRACOTTA:
+    category: deco
+    buy: 1.36
+    sell: 0.68
+  LIGHT_GRAY_BANNER:
+    category: deco
+    buy: 11.90
+    sell: 5.95
+  LIGHT_GRAY_BED:
+    category: deco
+    buy: 4.14
+    sell: 2.07
+  LIGHT_GRAY_CANDLE:
+    category: deco
+    buy: 5.54
+    sell: 2.77
+  LIGHT_GRAY_CARPET:
+    category: deco
+    buy: 1.32
+    sell: 0.66
+  LIGHT_GRAY_CONCRETE:
+    category: deco
+    buy: 0.38
+    sell: 0.19
+  LIGHT_GRAY_CONCRETE_POWDER:
+    category: deco
+    buy: 0.30
+    sell: 0.15
+  LIGHT_GRAY_DYE:
+    category: deco
+    buy: 0.66
+    sell: 0.33
+  LIGHT_GRAY_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.70
+    sell: 0.85
+  LIGHT_GRAY_STAINED_GLASS:
+    category: deco
+    buy: 0.22
+    sell: 0.11
+  LIGHT_GRAY_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.12
+    sell: 0.06
+  LIGHT_GRAY_TERRACOTTA:
+    category: deco
+    buy: 1.36
+    sell: 0.68
+  LIME_BANNER:
+    category: deco
+    buy: 10.40
+    sell: 5.20
+  LIME_BED:
+    category: deco
+    buy: 3.94
+    sell: 1.97
+  LIME_CANDLE:
+    category: deco
+    buy: 5.34
+    sell: 2.67
+  LIME_CARPET:
+    category: deco
+    buy: 1.16
+    sell: 0.58
+  LIME_CONCRETE:
+    category: deco
+    buy: 0.36
+    sell: 0.18
+  LIME_CONCRETE_POWDER:
+    category: deco
+    buy: 0.28
+    sell: 0.14
+  LIME_DYE:
+    category: deco
+    buy: 0.50
+    sell: 0.25
+  LIME_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.68
+    sell: 0.84
+  LIME_STAINED_GLASS:
+    category: deco
+    buy: 0.18
+    sell: 0.09
+  LIME_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.10
+    sell: 0.05
+  LIME_TERRACOTTA:
+    category: deco
+    buy: 1.34
+    sell: 0.67
+  MAGENTA_BANNER:
+    category: deco
+    buy: 10.40
+    sell: 5.20
+  MAGENTA_BED:
+    category: deco
+    buy: 3.94
+    sell: 1.97
+  MAGENTA_CANDLE:
+    category: deco
+    buy: 5.34
+    sell: 2.67
+  MAGENTA_CARPET:
+    category: deco
+    buy: 1.16
+    sell: 0.58
+  MAGENTA_CONCRETE:
+    category: deco
+    buy: 0.36
+    sell: 0.18
+  MAGENTA_CONCRETE_POWDER:
+    category: deco
+    buy: 0.28
+    sell: 0.14
+  MAGENTA_DYE:
+    category: deco
+    buy: 0.50
+    sell: 0.25
+  MAGENTA_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.68
+    sell: 0.84
+  MAGENTA_STAINED_GLASS:
+    category: deco
+    buy: 0.18
+    sell: 0.09
+  MAGENTA_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.10
+    sell: 0.05
+  MAGENTA_TERRACOTTA:
+    category: deco
+    buy: 1.34
+    sell: 0.67
+  ORANGE_BANNER:
+    category: deco
+    buy: 11.00
+    sell: 5.50
+  ORANGE_BED:
+    category: deco
+    buy: 4.00
+    sell: 2.00
+  ORANGE_CANDLE:
+    category: deco
+    buy: 5.40
+    sell: 2.70
+  ORANGE_CARPET:
+    category: deco
+    buy: 1.22
+    sell: 0.61
+  ORANGE_CONCRETE:
+    category: deco
+    buy: 0.36
+    sell: 0.18
+  ORANGE_CONCRETE_POWDER:
+    category: deco
+    buy: 0.28
+    sell: 0.14
+  ORANGE_DYE:
+    category: deco
+    buy: 0.56
+    sell: 0.28
+  ORANGE_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.68
+    sell: 0.84
+  ORANGE_STAINED_GLASS:
+    category: deco
+    buy: 0.20
+    sell: 0.10
+  ORANGE_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.10
+    sell: 0.05
+  ORANGE_TERRACOTTA:
+    category: deco
+    buy: 1.34
+    sell: 0.67
+  OXIDIZED_COPPER_CHAIN:
+    category: deco
+    buy: 3.20
+    sell: 1.60
+  OXIDIZED_COPPER_CHEST:
+    category: deco
+    buy: 21.26
+    sell: 10.63
+  OXIDIZED_COPPER_LANTERN:
+    category: deco
+    buy: 3.40
+    sell: 1.70
+  PAINTING:
+    category: deco
+    buy: 1.16
+    sell: 0.58
+  PINK_BANNER:
+    category: deco
+    buy: 9.66
+    sell: 4.83
+  PINK_BED:
+    category: deco
+    buy: 3.84
+    sell: 1.92
+  PINK_CANDLE:
+    category: deco
+    buy: 5.24
+    sell: 2.62
+  PINK_CARPET:
+    category: deco
+    buy: 1.08
+    sell: 0.54
+  PINK_CONCRETE:
+    category: deco
+    buy: 0.34
+    sell: 0.17
+  PINK_CONCRETE_POWDER:
+    category: deco
+    buy: 0.26
+    sell: 0.13
+  PINK_DYE:
+    category: deco
+    buy: 0.42
+    sell: 0.21
+  PINK_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.66
+    sell: 0.83
+  PINK_STAINED_GLASS:
+    category: deco
+    buy: 0.18
+    sell: 0.09
+  PINK_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.10
+    sell: 0.05
+  PINK_TERRACOTTA:
+    category: deco
+    buy: 1.32
+    sell: 0.66
+  PURPLE_BANNER:
+    category: deco
+    buy: 12.50
+    sell: 6.25
+  PURPLE_BED:
+    category: deco
+    buy: 4.20
+    sell: 2.10
+  PURPLE_CANDLE:
+    category: deco
+    buy: 5.60
+    sell: 2.80
+  PURPLE_CARPET:
+    category: deco
+    buy: 1.40
+    sell: 0.70
+  PURPLE_CONCRETE:
+    category: deco
+    buy: 0.38
+    sell: 0.19
+  PURPLE_CONCRETE_POWDER:
+    category: deco
+    buy: 0.30
+    sell: 0.15
+  PURPLE_DYE:
+    category: deco
+    buy: 0.72
+    sell: 0.36
+  PURPLE_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.74
+    sell: 0.87
+  PURPLE_STAINED_GLASS:
+    category: deco
+    buy: 0.22
+    sell: 0.11
+  PURPLE_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.12
+    sell: 0.06
+  PURPLE_TERRACOTTA:
+    category: deco
+    buy: 1.38
+    sell: 0.69
+  RED_BANNER:
+    category: deco
+    buy: 9.36
+    sell: 4.68
+  RED_BED:
+    category: deco
+    buy: 3.78
+    sell: 1.89
+  RED_CANDLE:
+    category: deco
+    buy: 5.18
+    sell: 2.59
+  RED_CARPET:
+    category: deco
+    buy: 1.04
+    sell: 0.52
+  RED_CONCRETE:
+    category: deco
+    buy: 0.34
+    sell: 0.17
+  RED_CONCRETE_POWDER:
+    category: deco
+    buy: 0.26
+    sell: 0.13
+  RED_DYE:
+    category: deco
+    buy: 0.38
+    sell: 0.19
+  RED_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.66
+    sell: 0.83
+  RED_STAINED_GLASS:
+    category: deco
+    buy: 0.16
+    sell: 0.08
+  RED_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.08
+    sell: 0.04
+  RED_TERRACOTTA:
+    category: deco
+    buy: 1.32
+    sell: 0.66
+  SCAFFOLDING:
+    category: deco
+    buy: 0.26
+    sell: 0.13
+  SEA_LANTERN:
+    category: deco
+    buy: 17.50
+    sell: 8.75
+  TERRACOTTA:
+    category: deco
+    buy: 1.00
+    sell: 0.50
+  TINTED_GLASS:
+    category: deco
+    buy: 10.06
+    sell: 5.03
+  TORCH:
+    category: deco
+    buy: 0.40
+    sell: 0.20
+  WAXED_COPPER_CHAIN:
+    category: deco
+    buy: 7.00
+    sell: 3.50
+  WAXED_COPPER_CHEST:
+    category: deco
+    buy: 29.58
+    sell: 14.79
+  WAXED_COPPER_LANTERN:
+    category: deco
+    buy: 7.26
+    sell: 3.63
+  WAXED_EXPOSED_COPPER_CHAIN:
+    category: deco
+    buy: 7.00
+    sell: 3.50
+  WAXED_EXPOSED_COPPER_CHEST:
+    category: deco
+    buy: 29.58
+    sell: 14.79
+  WAXED_EXPOSED_COPPER_LANTERN:
+    category: deco
+    buy: 7.26
+    sell: 3.63
+  WAXED_OXIDIZED_COPPER_CHAIN:
+    category: deco
+    buy: 7.00
+    sell: 3.50
+  WAXED_OXIDIZED_COPPER_CHEST:
+    category: deco
+    buy: 29.58
+    sell: 14.79
+  WAXED_OXIDIZED_COPPER_LANTERN:
+    category: deco
+    buy: 7.26
+    sell: 3.63
+  WAXED_WEATHERED_COPPER_CHAIN:
+    category: deco
+    buy: 7.00
+    sell: 3.50
+  WAXED_WEATHERED_COPPER_CHEST:
+    category: deco
+    buy: 29.58
+    sell: 14.79
+  WAXED_WEATHERED_COPPER_LANTERN:
+    category: deco
+    buy: 7.26
+    sell: 3.63
+  WEATHERED_COPPER_CHAIN:
+    category: deco
+    buy: 3.20
+    sell: 1.60
+  WEATHERED_COPPER_CHEST:
+    category: deco
+    buy: 21.26
+    sell: 10.63
+  WEATHERED_COPPER_LANTERN:
+    category: deco
+    buy: 3.40
+    sell: 1.70
+  WHITE_BANNER:
+    category: deco
+    buy: 4.56
+    sell: 2.28
+  WHITE_BED:
+    category: deco
+    buy: 2.64
+    sell: 1.32
+  WHITE_CANDLE:
+    category: deco
+    buy: 5.06
+    sell: 2.53
+  WHITE_CARPET:
+    category: deco
+    buy: 0.50
+    sell: 0.25
+  WHITE_CONCRETE:
+    category: deco
+    buy: 0.30
+    sell: 0.15
+  WHITE_CONCRETE_POWDER:
+    category: deco
+    buy: 0.24
+    sell: 0.12
+  WHITE_DYE:
+    category: deco
+    buy: 0.28
+    sell: 0.14
+  WHITE_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.64
+    sell: 0.82
+  WHITE_STAINED_GLASS:
+    category: deco
+    buy: 0.16
+    sell: 0.08
+  WHITE_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.08
+    sell: 0.04
+  WHITE_TERRACOTTA:
+    category: deco
+    buy: 1.30
+    sell: 0.65
+  YELLOW_BANNER:
+    category: deco
+    buy: 10.40
+    sell: 5.20
+  YELLOW_BED:
+    category: deco
+    buy: 3.94
+    sell: 1.97
+  YELLOW_CANDLE:
+    category: deco
+    buy: 5.34
+    sell: 2.67
+  YELLOW_CARPET:
+    category: deco
+    buy: 1.16
+    sell: 0.58
+  YELLOW_CONCRETE:
+    category: deco
+    buy: 0.36
+    sell: 0.18
+  YELLOW_CONCRETE_POWDER:
+    category: deco
+    buy: 0.28
+    sell: 0.14
+  YELLOW_DYE:
+    category: deco
+    buy: 0.50
+    sell: 0.25
+  YELLOW_GLAZED_TERRACOTTA:
+    category: deco
+    buy: 1.68
+    sell: 0.84
+  YELLOW_STAINED_GLASS:
+    category: deco
+    buy: 0.18
+    sell: 0.09
+  YELLOW_STAINED_GLASS_PANE:
+    category: deco
+    buy: 0.10
+    sell: 0.05
+  YELLOW_TERRACOTTA:
+    category: deco
+    buy: 1.34
+    sell: 0.67
+
+  # --------------------------- 装备 · 工具武器 / 盔甲 / 鞍具挽具 ---------------------------
+  ARROW:
+    category: gear
+    buy: 0.20
+    sell: 0.10
+  BLACK_HARNESS:
+    category: gear
+    buy: 10.20
+    sell: 5.10
+  BLUE_HARNESS:
+    category: gear
+    buy: 9.84
+    sell: 4.92
+  BOW:
+    category: gear
+    buy: 2.40
+    sell: 1.20
+  BROWN_HARNESS:
+    category: gear
+    buy: 10.20
+    sell: 5.10
+  BRUSH:
+    category: gear
+    buy: 3.06
+    sell: 1.53
+  CARROT_ON_A_STICK:
+    category: gear
+    buy: 2.38
+    sell: 1.19
+  CHAINMAIL_BOOTS:
+    category: gear
+    buy: 16.00
+    sell: 8.00
+  CHAINMAIL_CHESTPLATE:
+    category: gear
+    buy: 32.00
+    sell: 16.00
+  CHAINMAIL_HELMET:
+    category: gear
+    buy: 20.00
+    sell: 10.00
+  CHAINMAIL_LEGGINGS:
+    category: gear
+    buy: 28.00
+    sell: 14.00
+  COPPER_AXE:
+    category: gear
+    buy: 7.60
+    sell: 3.80
+  COPPER_BOOTS:
+    category: gear
+    buy: 10.00
+    sell: 5.00
+  COPPER_CHESTPLATE:
+    category: gear
+    buy: 20.00
+    sell: 10.00
+  COPPER_HELMET:
+    category: gear
+    buy: 12.50
+    sell: 6.25
+  COPPER_HOE:
+    category: gear
+    buy: 5.10
+    sell: 2.55
+  COPPER_HORSE_ARMOR:
+    category: gear
+    buy: 40.00
+    sell: 20.00
+  COPPER_LEGGINGS:
+    category: gear
+    buy: 17.50
+    sell: 8.75
+  COPPER_NAUTILUS_ARMOR:
+    category: gear
+    buy: 40.00
+    sell: 20.00
+  COPPER_PICKAXE:
+    category: gear
+    buy: 7.60
+    sell: 3.80
+  COPPER_SHOVEL:
+    category: gear
+    buy: 2.60
+    sell: 1.30
+  COPPER_SPEAR:
+    category: gear
+    buy: 2.60
+    sell: 1.30
+  COPPER_SWORD:
+    category: gear
+    buy: 5.06
+    sell: 2.53
+  CROSSBOW:
+    category: gear
+    buy: 13.96
+    sell: 6.98
+  CYAN_HARNESS:
+    category: gear
+    buy: 9.90
+    sell: 4.95
+  DIAMOND_AXE:
+    category: gear
+    buy: 300.10
+    sell: 150.05
+  DIAMOND_BOOTS:
+    category: gear
+    buy: 400.00
+    sell: 200.00
+  DIAMOND_CHESTPLATE:
+    category: gear
+    buy: 800.00
+    sell: 400.00
+  DIAMOND_HELMET:
+    category: gear
+    buy: 500.00
+    sell: 250.00
+  DIAMOND_HOE:
+    category: gear
+    buy: 200.10
+    sell: 100.05
+  DIAMOND_HORSE_ARMOR:
+    category: gear
+    buy: 300.00
+    sell: 150.00
+  DIAMOND_LEGGINGS:
+    category: gear
+    buy: 700.00
+    sell: 350.00
+  DIAMOND_NAUTILUS_ARMOR:
+    category: gear
+    buy: 300.00
+    sell: 150.00
+  DIAMOND_PICKAXE:
+    category: gear
+    buy: 300.10
+    sell: 150.05
+  DIAMOND_SHOVEL:
+    category: gear
+    buy: 100.10
+    sell: 50.05
+  DIAMOND_SPEAR:
+    category: gear
+    buy: 100.10
+    sell: 50.05
+  DIAMOND_SWORD:
+    category: gear
+    buy: 200.06
+    sell: 100.03
+  ELYTRA:
+    category: gear
+    buy: 1500.00
+    daily-buy: 4
+  FISHING_ROD:
+    category: gear
+    buy: 1.66
+    sell: 0.83
+  FLINT_AND_STEEL:
+    category: gear
+    buy: 7.76
+    sell: 3.88
+  GOLDEN_AXE:
+    category: gear
+    buy: 52.60
+    sell: 26.30
+  GOLDEN_BOOTS:
+    category: gear
+    buy: 70.00
+    sell: 35.00
+  GOLDEN_CHESTPLATE:
+    category: gear
+    buy: 140.00
+    sell: 70.00
+  GOLDEN_HELMET:
+    category: gear
+    buy: 87.50
+    sell: 43.75
+  GOLDEN_HOE:
+    category: gear
+    buy: 35.10
+    sell: 17.55
+  GOLDEN_HORSE_ARMOR:
+    category: gear
+    buy: 80.00
+    sell: 40.00
+  GOLDEN_LEGGINGS:
+    category: gear
+    buy: 122.50
+    sell: 61.25
+  GOLDEN_NAUTILUS_ARMOR:
+    category: gear
+    buy: 80.00
+    sell: 40.00
+  GOLDEN_PICKAXE:
+    category: gear
+    buy: 52.60
+    sell: 26.30
+  GOLDEN_SHOVEL:
+    category: gear
+    buy: 17.60
+    sell: 8.80
+  GOLDEN_SPEAR:
+    category: gear
+    buy: 17.60
+    sell: 8.80
+  GOLDEN_SWORD:
+    category: gear
+    buy: 35.06
+    sell: 17.53
+  GRAY_HARNESS:
+    category: gear
+    buy: 9.90
+    sell: 4.95
+  GREEN_HARNESS:
+    category: gear
+    buy: 9.44
+    sell: 4.72
+  IRON_AXE:
+    category: gear
+    buy: 22.60
+    sell: 11.30
+  IRON_BOOTS:
+    category: gear
+    buy: 30.00
+    sell: 15.00
+  IRON_CHESTPLATE:
+    category: gear
+    buy: 60.00
+    sell: 30.00
+  IRON_HELMET:
+    category: gear
+    buy: 37.50
+    sell: 18.75
+  IRON_HOE:
+    category: gear
+    buy: 15.10
+    sell: 7.55
+  IRON_HORSE_ARMOR:
+    category: gear
+    buy: 60.00
+    sell: 30.00
+  IRON_LEGGINGS:
+    category: gear
+    buy: 52.50
+    sell: 26.25
+  IRON_NAUTILUS_ARMOR:
+    category: gear
+    buy: 60.00
+    sell: 30.00
+  IRON_PICKAXE:
+    category: gear
+    buy: 22.60
+    sell: 11.30
+  IRON_SHOVEL:
+    category: gear
+    buy: 7.60
+    sell: 3.80
+  IRON_SPEAR:
+    category: gear
+    buy: 7.60
+    sell: 3.80
+  IRON_SWORD:
+    category: gear
+    buy: 15.06
+    sell: 7.53
+  LEATHER_BOOTS:
+    category: gear
+    buy: 10.00
+    sell: 5.00
+  LEATHER_CHESTPLATE:
+    category: gear
+    buy: 20.00
+    sell: 10.00
+  LEATHER_HELMET:
+    category: gear
+    buy: 12.50
+    sell: 6.25
+  LEATHER_HORSE_ARMOR:
+    category: gear
+    buy: 17.50
+    sell: 8.75
+  LEATHER_LEGGINGS:
+    category: gear
+    buy: 17.50
+    sell: 8.75
+  LIGHT_BLUE_HARNESS:
+    category: gear
+    buy: 9.68
+    sell: 4.84
+  LIGHT_GRAY_HARNESS:
+    category: gear
+    buy: 9.68
+    sell: 4.84
+  LIME_HARNESS:
+    category: gear
+    buy: 9.44
+    sell: 4.72
+  MACE:
+    category: gear
+    buy: 510.00
+    sell: 255.00
+  MAGENTA_HARNESS:
+    category: gear
+    buy: 9.44
+    sell: 4.72
+  # 下界合金装备走锻造台递推：1.25 × (钻石同款买价 + 下界合金锭 1000 + 升级模板 200)
+  NETHERITE_AXE:
+    category: gear
+    buy: 1875.14
+    sell: 937.57
+  NETHERITE_BOOTS:
+    category: gear
+    buy: 2000.00
+    sell: 1000.00
+  NETHERITE_CHESTPLATE:
+    category: gear
+    buy: 2500.00
+    sell: 1250.00
+  NETHERITE_HELMET:
+    category: gear
+    buy: 2125.00
+    sell: 1062.50
+  NETHERITE_HOE:
+    category: gear
+    buy: 1750.14
+    sell: 875.07
+  NETHERITE_HORSE_ARMOR:
+    category: gear
+    buy: 1875.00
+    sell: 937.50
+  NETHERITE_LEGGINGS:
+    category: gear
+    buy: 2375.00
+    sell: 1187.50
+  NETHERITE_NAUTILUS_ARMOR:
+    category: gear
+    buy: 1875.00
+    sell: 937.50
+  NETHERITE_PICKAXE:
+    category: gear
+    buy: 1875.14
+    sell: 937.57
+  NETHERITE_SHOVEL:
+    category: gear
+    buy: 1625.14
+    sell: 812.57
+  NETHERITE_SPEAR:
+    category: gear
+    buy: 1625.14
+    sell: 812.57
+  NETHERITE_SWORD:
+    category: gear
+    buy: 1750.08
+    sell: 875.04
+  ORANGE_HARNESS:
+    category: gear
+    buy: 9.54
+    sell: 4.77
+  PINK_HARNESS:
+    category: gear
+    buy: 9.30
+    sell: 4.65
+  PURPLE_HARNESS:
+    category: gear
+    buy: 9.78
+    sell: 4.89
+  RED_HARNESS:
+    category: gear
+    buy: 9.26
+    sell: 4.63
+  SADDLE:
+    category: gear
+    buy: 12.00
+    sell: 6.00
+  SHEARS:
+    category: gear
+    buy: 15.00
+    sell: 7.50
+  SHIELD:
+    category: gear
+    buy: 8.26
+    sell: 4.13
+  SPECTRAL_ARROW:
+    category: gear
+    buy: 1.14
+    sell: 0.57
+  STONE_AXE:
+    category: gear
+    buy: 0.18
+    sell: 0.09
+  STONE_HOE:
+    category: gear
+    buy: 0.16
+    sell: 0.08
+  STONE_PICKAXE:
+    category: gear
+    buy: 0.18
+    sell: 0.09
+  STONE_SHOVEL:
+    category: gear
+    buy: 0.14
+    sell: 0.07
+  STONE_SPEAR:
+    category: gear
+    buy: 0.14
+    sell: 0.07
+  STONE_SWORD:
+    category: gear
+    buy: 0.10
+    sell: 0.05
+  TRIDENT:
+    category: gear
+    buy: 200.00
+    sell: 100.00
+    daily-sell: 64
+  TURTLE_HELMET:
+    category: gear
+    buy: 37.50
+    sell: 18.75
+  WARPED_FUNGUS_ON_A_STICK:
+    category: gear
+    buy: 2.84
+    sell: 1.42
+  WHITE_HARNESS:
+    category: gear
+    buy: 8.46
+    sell: 4.23
+  WIND_CHARGE:
+    category: gear
+    buy: 2.50
+    sell: 1.25
+  WOLF_ARMOR:
+    category: gear
+    buy: 30.00
+    sell: 15.00
+  WOODEN_AXE:
+    category: gear
+    buy: 0.48
+    sell: 0.24
+  WOODEN_HOE:
+    category: gear
+    buy: 0.36
+    sell: 0.18
+  WOODEN_PICKAXE:
+    category: gear
+    buy: 0.48
+    sell: 0.24
+  WOODEN_SHOVEL:
+    category: gear
+    buy: 0.24
+    sell: 0.12
+  WOODEN_SPEAR:
+    category: gear
+    buy: 0.24
+    sell: 0.12
+  WOODEN_SWORD:
+    category: gear
+    buy: 0.30
+    sell: 0.15
+  YELLOW_HARNESS:
+    category: gear
+    buy: 9.44
+    sell: 4.72
+
+  # --------------------------- 酿造 · 药材 / 玻璃瓶 / 附魔之瓶 ---------------------------
+  BLAZE_POWDER:
+    category: brew
+    buy: 3.76
+    sell: 1.88
+  BLAZE_ROD:
+    category: brew
+    buy: 6.00
+    sell: 3.00
+    daily-sell: 1024
+  BREWING_STAND:
+    category: brew
+    buy: 7.58
+    sell: 3.79
+  CAULDRON:
+    category: brew
+    buy: 52.50
+    sell: 26.25
+  DRAGON_BREATH:
+    category: brew
+    buy: 20.00
+    sell: 10.00
+    daily-sell: 64
+  EXPERIENCE_BOTTLE:
+    category: brew
+    buy: 8.00
+    daily-buy: 512
+  FERMENTED_SPIDER_EYE:
+    category: brew
+    buy: 2.08
+    sell: 1.04
+  GHAST_TEAR:
+    category: brew
+    buy: 16.00
+    sell: 8.00
+    daily-sell: 512
+  GLASS_BOTTLE:
+    category: brew
+    buy: 0.10
+    sell: 0.05
+  GLISTERING_MELON_SLICE:
+    category: brew
+    buy: 19.76
+    sell: 9.88
+  GLOWSTONE_DUST:
+    category: brew
+    buy: 0.40
+    sell: 0.20
+    daily-sell: 2048
+  GOLDEN_CARROT:
+    category: brew
+    buy: 19.90
+    sell: 9.95
+  MAGMA_CREAM:
+    category: brew
+    buy: 4.40
+    sell: 2.20
+    daily-sell: 1024
+  NETHER_WART:
+    category: brew
+    buy: 0.60
+    sell: 0.30
+    daily-sell: 8192
+  PHANTOM_MEMBRANE:
+    category: brew
+    buy: 12.00
+    sell: 6.00
+    daily-sell: 512
+  RABBIT_FOOT:
+    category: brew
+    buy: 8.00
+    sell: 4.00
+  SPIDER_EYE:
+    category: brew
+    buy: 0.80
+    sell: 0.40
+    daily-sell: 8192
+  SUGAR:
+    category: brew
+    buy: 0.26
+    sell: 0.13
+
+  # --------------------------- 杂项 · 工作方块 / 容器 / 桶 / 书与地图 ---------------------------
+  ANVIL:
+    category: misc
+    buy: 232.50
+    sell: 116.25
+  BARREL:
+    category: misc
+    buy: 0.96
+    sell: 0.48
+  BLAST_FURNACE:
+    category: misc
+    buy: 37.98
+    sell: 18.99
   BOOK:
     category: misc
     buy: 3.00
     sell: 1.50
-  PAPER:
+  BOWL:
     category: misc
-    buy: 0.30
-    sell: 0.15
-  FLINT:
-    category: misc
-    buy: 0.20
-    sell: 0.10
+    buy: 0.10
+    sell: 0.05
+  # 低于 3 铁锭买价，铁桶不能反向套现
   BUCKET:
     category: misc
     buy: 20.00
     sell: 9.00
-  # 只卖不收：金币回收口，防止倒卖回流
-  EXPERIENCE_BOTTLE:
+  CARTOGRAPHY_TABLE:
     category: misc
-    buy: 8.00
-    daily-buy: 512
-  ELYTRA:
+    buy: 1.26
+    sell: 0.63
+  CHEST:
     category: misc
-    buy: 1500.00
-    daily-buy: 4
-  ENCHANTED_GOLDEN_APPLE:
+    buy: 1.00
+    sell: 0.50
+  CLOCK:
     category: misc
-    buy: 2000.00
-    daily-buy: 8
+    buy: 71.26
+    sell: 35.63
+  COMPASS:
+    category: misc
+    buy: 31.26
+    sell: 15.63
+  CRAFTING_TABLE:
+    category: misc
+    buy: 0.50
+    sell: 0.25
+  ENCHANTING_TABLE:
+    category: misc
+    buy: 218.76
+    sell: 109.38
+  FIRE_CHARGE:
+    category: misc
+    buy: 2.90
+    sell: 1.45
+  FLETCHING_TABLE:
+    category: misc
+    buy: 1.00
+    sell: 0.50
+  FURNACE:
+    category: misc
+    buy: 0.20
+    sell: 0.10
+  GRINDSTONE:
+    category: misc
+    buy: 0.40
+    sell: 0.20
+  JUKEBOX:
+    category: misc
+    buy: 101.00
+    sell: 50.50
+  LAVA_BUCKET:
+    category: misc
+    buy: 24.00
+    sell: 12.00
+  LEAD:
+    category: misc
+    buy: 2.00
+    sell: 1.00
+  LECTERN:
+    category: misc
+    buy: 15.40
+    sell: 7.70
+  LODESTONE:
+    category: misc
+    buy: 8.10
+    sell: 4.05
+  LOOM:
+    category: misc
+    buy: 1.76
+    sell: 0.88
+  MAP:
+    category: misc
+    buy: 42.08
+    sell: 21.04
+  # 26.x 起可用铜/铁/金粒 + 纸合成，价格随配方成本推导（旧的 40.00 会印钱）
+  NAME_TAG:
+    category: misc
+    buy: 0.74
+    sell: 0.37
+  PAPER:
+    category: misc
+    buy: 0.30
+    sell: 0.15
+  POWDER_SNOW_BUCKET:
+    category: misc
+    buy: 20.40
+    sell: 10.20
+  RECOVERY_COMPASS:
+    category: misc
+    buy: 639.08
+    sell: 319.54
+  SMITHING_TABLE:
+    category: misc
+    buy: 15.50
+    sell: 7.75
+  SMOKER:
+    category: misc
+    buy: 4.26
+    sell: 2.13
+  SPYGLASS:
+    category: misc
+    buy: 10.00
+    sell: 5.00
+  SULFUR_CUBE_BUCKET:
+    category: misc
+    buy: 28.00
+    sell: 14.00
+    daily-sell: 512
+  WATER_BUCKET:
+    category: misc
+    buy: 20.40
+    sell: 10.20
+  WRITABLE_BOOK:
+    category: misc
+    buy: 5.26
+    sell: 2.63
+

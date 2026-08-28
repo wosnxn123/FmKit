@@ -2,7 +2,6 @@ package dev.fm.shop.store;
 
 import dev.fm.shop.FmShopPlugin;
 import dev.fm.shop.util.Money;
-import org.bukkit.Material;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -10,11 +9,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Server-wide dynamic pricing: one multiplier per item, in basis points.
+ * Server-wide dynamic pricing: one multiplier per price row, in basis points.
  *
  * <p>Buying pushes an item's multiplier up, selling pushes it down, and it
  * drifts back toward 100% over time. Both directions are scaled by the SAME
@@ -39,7 +38,9 @@ public final class MarketState {
     }
 
     private final FmShopPlugin plugin;
-    private final Map<Material, Row> rows = new EnumMap<>(Material.class);
+    // Keyed by row id: two book rows share ENCHANTED_BOOK but trade
+    // independently. Sized for traded rows only - most rows never move off 100%.
+    private final Map<String, Row> rows = new HashMap<>(64);
     private final File file;
     private boolean dirty;
 
@@ -88,23 +89,23 @@ public final class MarketState {
         dirty = true;
     }
 
-    /** Admin reset of one item's multiplier, or all of them when null. */
-    public synchronized void reset(Material mat) {
-        if (mat == null) {
+    /** Admin reset of one row's multiplier, or all of them when null. */
+    public synchronized void reset(String id) {
+        if (id == null) {
             rows.clear();
         } else {
-            rows.remove(mat);
+            rows.remove(id);
         }
         dirty = true;
     }
 
-    public synchronized long bought(Material mat) {
-        Row r = rows.get(mat);
+    public synchronized long bought(String id) {
+        Row r = rows.get(id);
         return r == null ? 0 : r.boughtTotal;
     }
 
-    public synchronized long sold(Material mat) {
-        Row r = rows.get(mat);
+    public synchronized long sold(String id) {
+        Row r = rows.get(id);
         return r == null ? 0 : r.soldTotal;
     }
 
@@ -120,7 +121,7 @@ public final class MarketState {
     }
 
     private Row settle(PriceEntry e, long nowMs) {
-        Row r = rows.computeIfAbsent(e.material(), k -> {
+        Row r = rows.computeIfAbsent(e.id(), k -> {
             Row fresh = new Row();
             fresh.lastMs = nowMs;
             return fresh;
@@ -180,16 +181,19 @@ public final class MarketState {
             return;
         }
         for (String key : y.getKeys(false)) {
-            Material mat = Material.matchMaterial(key);
-            if (mat == null) {
+            if (!y.isConfigurationSection(key)) {
                 continue;
             }
+            // Keys are row ids used verbatim. A plain row's id is its material
+            // name, which is what old market files already store, so no key
+            // migration is needed - and a book id (ENCHANTED_BOOK/SHARPNESS/5)
+            // would not survive a Material lookup anyway.
             Row r = new Row();
             r.mulBp = Math.max(1, y.getInt(key + ".mul-bp", BASE_BP));
             r.lastMs = y.getLong(key + ".last-ms", System.currentTimeMillis());
             r.boughtTotal = Math.max(0, y.getLong(key + ".bought"));
             r.soldTotal = Math.max(0, y.getLong(key + ".sold"));
-            rows.put(mat, r);
+            rows.put(key, r);
         }
         dirty = false;
     }
@@ -197,12 +201,12 @@ public final class MarketState {
     /** Snapshot for the IO thread; call on the caller's thread. */
     public synchronized YamlConfiguration snapshot() {
         YamlConfiguration y = new YamlConfiguration();
-        for (Map.Entry<Material, Row> en : rows.entrySet()) {
+        for (Map.Entry<String, Row> en : rows.entrySet()) {
             Row r = en.getValue();
             if (r.mulBp == BASE_BP && r.boughtTotal == 0 && r.soldTotal == 0) {
                 continue;
             }
-            String k = en.getKey().name();
+            String k = en.getKey();
             y.set(k + ".mul-bp", r.mulBp);
             y.set(k + ".last-ms", r.lastMs);
             y.set(k + ".bought", r.boughtTotal);

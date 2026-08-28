@@ -173,7 +173,7 @@ plugins/FmKit/
 - lore 倒计时**打开时动态渲染**，不预存。
 - 点击时**二次校验**（条目仍存在、未过期），防并发拿同一件。
 - 音效可关；边框/标题/槽位/文案全进 config。
-- 回收站是普通箱子 GUI，可正常关闭（无需 FmTerm 那种强制重开）。
+- 回收站是普通箱子 GUI，可正常关闭，不强制重开。
 
 ### 7.5 取回与重渲染规则（1.1）
 - **全部取回统一最旧优先**：公共/私人按存入时间全局排序（跨页），不再"当前页优先"。
@@ -392,10 +392,12 @@ FmKit/
 
 手工验证由 `bot/fmkit_test.js` 取代（mineflayer 机器人 + RCON 控制台驱动，一次性自检，输出 PASS/FAIL/FATAL）：
 
-1. 起服务端（26.1）：`cd servers/folia261 && java -Xmx2G -jar folia-26.1.2-8.jar nogui`（游戏端口 25567，RCON 25575）；
-2. 跑套件：`cd bot && node fmkit_test.js`；测 26.2 用 `PORT=25568 RCON_PORT=25576 MC_VERSION=26.2`（对应 `servers/folia262`）。
+1. 起一台 Folia / Paper 26.1 服务端并开启 RCON（游戏端口 25567、RCON 25575，即套件默认值）；
+2. 跑套件：`cd bot && node fmkit_test.js`；测 26.2 用 `PORT=25568 RCON_PORT=25576 MC_VERSION=26.2`。
 
-每轮运行前以基线步骤复位状态（op + `clearpublic` 两步 + `notify <bot> valuable` + `destroy <bot> off`），消除跨轮残留。覆盖约 50 组断言：FmTerm 接受与回收开关/死亡掉落分流（T0、I1-I7）；双清单 add/remove/clear/on/off 与持久化、`sweep now`（I12 族）；私人箱翻页/取回/两步销毁/状态（I27-I29、N6/N7）；到期提醒三档 + GUI 图标颜色 + 管理 `notify`/`destroy` 代设 + 新玩家默认档（V0-V3、V7、A1-A5）；公共箱 TTL 过期清除与无主物品清扫（8d、V2/V2b）；全部取回与堆叠合并规则（I39-I40、V4-V6）；倒计时与 `interval` 持久化（I38）；`clearpublic` 两步确认（I8 族）；`bin`/`clear`/`status`/`toggle` 离线操作与无权限拒绝（I9、I34-I35）；分页（I36-I37）；`reload` 后配置持久化（I40d）。
+服务端准备、环境变量与退出码见 [../docs/构建与测试.md](../docs/构建与测试.md#自动化测试)。
+
+每轮运行前以基线步骤复位状态（op + `clearpublic` 两步 + `notify <bot> valuable` + `destroy <bot> off`），消除跨轮残留。覆盖的断言组：机器人进服与回收开关／死亡掉落分流（T0、I1-I7）；双清单 add/remove/clear/on/off 与持久化、`sweep now`（I12 族）；私人箱翻页/取回/两步销毁/状态（I27-I29、N6/N7）；到期提醒三档 + GUI 图标颜色 + 管理 `notify`/`destroy` 代设 + 新玩家默认档（V0-V3、V7、A1-A5）；公共箱 TTL 过期清除与无主物品清扫（8d、V2/V2b）；全部取回与堆叠合并规则（I39-I40、V4-V6）；倒计时与 `interval` 持久化（I38）；`clearpublic` 两步确认（I8 族）；`bin`/`clear`/`status`/`toggle` 离线操作与无权限拒绝（I9、I34-I35）；分页（I36-I37）；`reload` 后配置持久化（I40d）。
 
 ---
 

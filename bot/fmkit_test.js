@@ -424,10 +424,14 @@ async function scenario() {
   record('I14 toggle back on', echoOf(bot, '回收已开启'))
 
   // ---- Item 6: 公共箱容量淘汰（上限 3；用 4 种不同无主物品触发，同款会合并不触发淘汰）----
+  // 同一轮扫地里 depositAt 是同一个时间戳，先后顺序只由实体存活 tick 数（seq=-ticksLived）区分，
+  // 同 tick 出生则并列、退化成按随机 UUID 比较 —— 故每次召唤之间隔开 >1 tick（50ms），
+  // 让"最旧先淘汰"有确定的年龄差可比。
   bot.messages.length = 0
   const evictMats = ['cobblestone', 'granite', 'diorite', 'andesite']
   for (let i = 0; i < evictMats.length; i++) {
     await rcon(`execute as ${BOT_NAME} at @s run summon minecraft:item ~ ~1 ~${5 + i} {Item:{id:"minecraft:${evictMats[i]}",count:1}}`)
+    await sleep(120)
   }
   const sweep2 = await waitFor(() => echoOf(bot, '收集了'), 30000)
   record('I15 eviction: overflow swept', !!sweep2)
@@ -1000,6 +1004,16 @@ async function scenario() {
   await waitFor(() => echoOf(bot, '再执行一次以确认'), 5000)
   await bot.chat('/fmkitadmin clearpublic')
   await waitFor(() => echoOf(bot, '已清空公共回收站'), 5000)
+
+  // 别名注册：plugin.yml 的 aliases 只有真进服注册了才算生效
+  const aliasWin = await openGui(bot, '/fkt')
+  record('N10 /fkt 别名打开回收站选择页', !!aliasWin, `start=${aliasWin && aliasWin.inventoryStart}`)
+  closeGui(bot)
+  bot.messages.length = 0
+  await bot.chat('/fkta status')
+  record('N11 /fkta 别名执行管理指令',
+    !!(await waitFor(() => echoOf(bot, 'FmKit 状态') || echoOf(bot, '私人箱：'), 5000)),
+    bot.messages.slice(-3).join(' | ').slice(0, 160))
 
   bot.quit()
   await sleep(500)

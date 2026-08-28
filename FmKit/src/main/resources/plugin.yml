@@ -9,10 +9,12 @@ commands:
   fmkit:
     description: Open the recycle bin menu.
     permission: fmkit.use
+    aliases: [fkt]
     usage: /<command> [private|public|toggle [on|off]|help]
   fmkitadmin:
     description: FmKit admin commands.
     permission: fmkit.admin
+    aliases: [fkta]
     usage: /<command> <clearpublic|clear <player>|bin <player>|reload|sweep <on|off|now>|interval <seconds>|whitelist [add|remove|clear]|toggle <player> <on|off>|status|help>
 permissions:
   fmkit.use:

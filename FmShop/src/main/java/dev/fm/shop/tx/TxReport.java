@@ -1,11 +1,10 @@
 package dev.fm.shop.tx;
 
 import dev.fm.shop.FmShopPlugin;
-import dev.fm.shop.util.ItemNames;
+import dev.fm.shop.store.ItemKey;
 import dev.fm.shop.util.Money;
 import dev.fm.shop.util.TextUtil;
 import dev.fm.shop.util.TimeUtil;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 /**
@@ -20,8 +19,8 @@ public final class TxReport {
     private TxReport() {
     }
 
-    public static void tell(FmShopPlugin plugin, Player p, Material mat, TxResult r) {
-        String item = mat == null ? "" : ItemNames.mini(mat);
+    public static void tell(FmShopPlugin plugin, Player p, ItemKey key, TxResult r) {
+        String item = key == null ? "" : key.mini();
         String line = switch (r.key()) {
             case "buy-ok" -> TextUtil.apply(plugin.settings().msg("buy-ok"),
                     "item", item, "n", String.valueOf(r.qty()), "cost", money(plugin, r.net()));
@@ -32,7 +31,7 @@ public final class TxReport {
                     : "");
             case "no-money" -> TextUtil.apply(plugin.settings().msg("no-money"),
                     "need", money(plugin, r.need()));
-            case "quota-buy", "quota-sell" -> TextUtil.apply(plugin.settings().msg(r.key()),
+            case "quota-buy", "quota-sell", "quota-lifetime" -> TextUtil.apply(plugin.settings().msg(r.key()),
                     "item", item,
                     "limit", String.valueOf(r.limit()),
                     "left", String.valueOf(r.left()),

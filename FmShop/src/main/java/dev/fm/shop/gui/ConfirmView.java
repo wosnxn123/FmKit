@@ -6,7 +6,6 @@ import dev.fm.shop.store.PriceEntry;
 import dev.fm.shop.tx.TxEngine;
 import dev.fm.shop.tx.TxReport;
 import dev.fm.shop.tx.TxResult;
-import dev.fm.shop.util.ItemNames;
 import dev.fm.shop.util.Money;
 import dev.fm.shop.util.TextUtil;
 import net.kyori.adventure.text.Component;
@@ -60,7 +59,7 @@ public final class ConfirmView extends View {
     @Override
     protected Component title() {
         return Icons.plain(TextUtil.apply(plugin.settings().msg("gui-title-confirm"),
-                "item", ItemNames.plain(entry.material())));
+                "item", entry.key().mini()));
     }
 
     @Override
@@ -100,8 +99,8 @@ public final class ConfirmView extends View {
                 : "<gold>可得 <white>" + Money.format(total, cur));
         lore.add("");
         lore.add("<gray>上限 <white>" + cap.max() + "</white> <dark_gray>(" + cap.reason() + ")");
-        getInventory().setItem(SLOT_PREVIEW, Icons.of(entry.material(), qty,
-                (buying ? "<green>买入 " : "<gold>卖出 ") + ItemNames.plain(entry.material()), lore));
+        getInventory().setItem(SLOT_PREVIEW, Icons.of(entry.probe(), qty,
+                (buying ? "<green>买入 " : "<gold>卖出 ") + entry.key().mini(), lore));
 
         getInventory().setItem(SLOT_BACK, Icons.of(plugin.settings().icon("back", Material.ARROW),
                 "<white>返回", List.of("<gray>不进行交易")));
@@ -152,7 +151,7 @@ public final class ConfirmView extends View {
         TxResult r = buying
                 ? plugin.tx().buy(player, entry, qty)
                 : plugin.tx().sell(player, entry, qty);
-        TxReport.tell(plugin, player, entry.material(), r);
+        TxReport.tell(plugin, player, entry.key(), r);
         if (!r.ok()) {
             Gui.deny(plugin, player);
         }
@@ -199,13 +198,13 @@ public final class ConfirmView extends View {
         String reason = "单次上限";
         if (buying) {
             if (entry.dailyBuy() > 0) {
-                int left = Math.max(0, entry.dailyBuy() - d.boughtToday(entry.material(), today));
+                int left = Math.max(0, entry.dailyBuy() - d.boughtToday(entry.id(), today));
                 if (left < max) {
                     max = left;
                     reason = "今日限购";
                 }
             }
-            int room = TxEngine.space(player.getInventory(), entry.material());
+            int room = TxEngine.space(player.getInventory(), entry.probe());
             if (room < max) {
                 max = room;
                 reason = "背包空间";
@@ -217,13 +216,13 @@ public final class ConfirmView extends View {
             }
         } else {
             if (entry.dailySell() > 0) {
-                int left = Math.max(0, entry.dailySell() - d.soldToday(entry.material(), today));
+                int left = Math.max(0, entry.dailySell() - d.soldToday(entry.id(), today));
                 if (left < max) {
                     max = left;
                     reason = "今日限售";
                 }
             }
-            int have = TxEngine.count(player.getInventory(), new ItemStack(entry.material()));
+            int have = TxEngine.count(player.getInventory(), entry.probe());
             if (have < max) {
                 max = have;
                 reason = "持有数量";

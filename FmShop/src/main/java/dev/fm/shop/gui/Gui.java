@@ -5,7 +5,6 @@ import dev.fm.shop.store.MarketState;
 import dev.fm.shop.store.PlayerData;
 import dev.fm.shop.store.PriceEntry;
 import dev.fm.shop.tx.TxEngine;
-import dev.fm.shop.util.ItemNames;
 import dev.fm.shop.util.Money;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -48,8 +47,19 @@ final class Gui {
     }
 
     /**
+     * Whether {@code e} is unlock-gated and this player has not unlocked it yet.
+     *
+     * <p>Menus must ask this rather than {@link PriceEntry#buyable()} alone: the
+     * row has a real buy price, it is only this player who cannot use it, so a
+     * price-only check would advertise a purchase the engine then refuses.
+     */
+    static boolean locked(FmShopPlugin plugin, PriceEntry e, Player p) {
+        return e.unlockBySell() && !plugin.data().loadSync(p.getUniqueId()).unlocked(e.id());
+    }
+
+    /**
      * Per-item lore: both prices, the live market multiplier, what the player
-     * holds, and remaining daily quota.
+     * holds, remaining daily quota, and any lifetime sell allowance.
      *
      * <p>Prices shown are unit prices at this instant. A trade recomputes them,
      * so a menu left open across a price move charges the new price and says so
@@ -57,8 +67,14 @@ final class Gui {
      */
     static List<String> priceLore(FmShopPlugin plugin, PriceEntry e, Player p, long now) {
         String cur = plugin.settings().currency();
-        List<String> lore = new ArrayList<>(8);
-        if (e.buyable()) {
+        PlayerData d = plugin.data().loadSync(p.getUniqueId());
+        long today = plugin.settings().today();
+        boolean locked = e.unlockBySell() && !d.unlocked(e.id());
+        List<String> lore = new ArrayList<>(10);
+        if (locked) {
+            lore.add("<red>未解锁");
+            lore.add("<gray>先卖出 <white>1</white> 个给商店，永久解锁购买");
+        } else if (e.buyable()) {
             lore.add("<green>左键买入 <white>" + Money.format(plugin.market().buyUnit(e, now), cur) + "</white> /个");
         } else {
             lore.add("<dark_gray>不出售");
@@ -75,19 +91,21 @@ final class Gui {
                     : bp < MarketState.BASE_BP ? "<green>↓ 走低" : "<gray>持平";
             lore.add("<gray>行情 <white>" + percent + "%</white> " + trend);
         }
-        int have = TxEngine.count(p.getInventory(), new ItemStack(e.material()));
+        int have = TxEngine.count(p.getInventory(), e.probe());
         lore.add("");
         lore.add("<gray>背包持有 <white>" + have);
-        PlayerData d = plugin.data().loadSync(p.getUniqueId());
-        long today = plugin.settings().today();
-        if (e.dailyBuy() > 0) {
-            lore.add("<gray>今日可买 <white>" + Math.max(0, e.dailyBuy() - d.boughtToday(e.material(), today)));
+        if (e.dailyBuy() > 0 && !locked) {
+            lore.add("<gray>今日可买 <white>" + Math.max(0, e.dailyBuy() - d.boughtToday(e.id(), today)));
         }
         if (e.dailySell() > 0) {
-            lore.add("<gray>今日可卖 <white>" + Math.max(0, e.dailySell() - d.soldToday(e.material(), today)));
+            lore.add("<gray>今日可卖 <white>" + Math.max(0, e.dailySell() - d.soldToday(e.id(), today)));
+        }
+        if (e.lifetimeSell() > 0) {
+            lore.add("<gray>终身可卖 <white>" + Math.max(0, e.lifetimeSell() - d.soldEver(e.id()))
+                    + "</white> <dark_gray>（不重置）");
         }
         lore.add("");
-        if (e.buyable()) {
+        if (e.buyable() && !locked) {
             lore.add("<yellow>左键 <gray>选择数量买入");
         }
         if (e.sellable()) {
@@ -100,8 +118,12 @@ final class Gui {
     }
 
     static ItemStack itemIcon(FmShopPlugin plugin, PriceEntry e, Player p, long now) {
-        return Icons.of(e.material(), "<white>" + ItemNames.plain(e.material()),
-                priceLore(plugin, e, p, now));
+        String name = locked(plugin, e, p)
+                ? "<dark_gray>" + e.key().mini() + " <red>[未解锁]"
+                : "<white>" + e.key().mini();
+        // Probe, not bare material: an enchanted book must render its stored
+        // enchantment, and the new overload clones before decorating.
+        return Icons.of(e.probe(), name, priceLore(plugin, e, p, now));
     }
 
     static void click(FmShopPlugin plugin, Player p) {

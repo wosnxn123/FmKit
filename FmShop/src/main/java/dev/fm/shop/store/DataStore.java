@@ -2,7 +2,6 @@ package dev.fm.shop.store;
 
 import dev.fm.shop.FmShopPlugin;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -158,6 +157,7 @@ public final class DataStore {
                 Math.max(0, y.getLong("total-earned")));
         readCounters(y.getConfigurationSection("bought"), true, d);
         readCounters(y.getConfigurationSection("sold"), false, d);
+        readLifetime(y.getConfigurationSection("sold-ever"), d);
         d.clean();
         return d;
     }
@@ -166,11 +166,36 @@ public final class DataStore {
         if (sec == null) {
             return;
         }
+        // Keys are row ids, exactly as in readLifetime: a Material filter would
+        // silently drop every book counter (ENCHANTED_BOOK/SHARPNESS/5 is not a
+        // material name).
         for (String key : sec.getKeys(false)) {
-            Material mat = Material.matchMaterial(key);
             int n = sec.getInt(key);
-            if (mat != null && n > 0) {
-                d.restoreCounter(buy, mat, n);
+            if (n > 0) {
+                d.restoreCounter(buy, key, n);
+            }
+        }
+    }
+
+    /**
+     * Restores lifetime sell counts.
+     *
+     * <p>A missing section means an empty ledger, which is exactly right for
+     * saves written before unlock gating existed: every gated row was also
+     * unbuyable back then, so nobody loses access they previously had.
+     *
+     * <p>Keys are row ids, not necessarily material names, so no {@code
+     * matchMaterial} filter here - a row that has since been renamed or removed
+     * keeps its count rather than silently unlocking again if it comes back.
+     */
+    private void readLifetime(ConfigurationSection sec, PlayerData d) {
+        if (sec == null) {
+            return;
+        }
+        for (String key : sec.getKeys(false)) {
+            int n = sec.getInt(key);
+            if (n > 0) {
+                d.restoreSoldEver(key, n);
             }
         }
     }
@@ -186,6 +211,9 @@ public final class DataStore {
         }
         for (Map.Entry<String, Integer> e : d.soldSnapshot().entrySet()) {
             y.set("sold." + e.getKey(), e.getValue());
+        }
+        for (Map.Entry<String, Integer> e : d.soldEverSnapshot().entrySet()) {
+            y.set("sold-ever." + e.getKey(), e.getValue());
         }
         return y;
     }

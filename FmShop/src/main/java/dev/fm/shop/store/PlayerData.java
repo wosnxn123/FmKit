@@ -1,14 +1,14 @@
 package dev.fm.shop.store;
 
 import dev.fm.shop.util.Money;
-import org.bukkit.Material;
 
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * One player's shop state: balance plus today's per-item traded amounts.
+ * One player's shop state: balance, today's per-item traded amounts, and the
+ * lifetime sell counts that drive unlock gating.
  *
  * <p>All mutation goes through {@code synchronized} accessors. Buy and sell run
  * on the acting player's region thread while admin commands and the shutdown
@@ -21,8 +21,18 @@ public final class PlayerData {
     private long balance;
     /** Epoch day the counters below belong to; a different day resets them. */
     private long day;
-    private final Map<Material, Integer> bought = new EnumMap<>(Material.class);
-    private final Map<Material, Integer> sold = new EnumMap<>(Material.class);
+    /** Today's per-row counts, keyed by {@link PriceEntry#id()}. */
+    private final Map<String, Integer> bought = new HashMap<>(8);
+    private final Map<String, Integer> sold = new HashMap<>(8);
+    /**
+     * Lifetime sell counts keyed by {@link PriceEntry#id()}.
+     *
+     * <p>Unlike {@link #sold} this is never cleared by {@link #roll}: it is the
+     * evidence that the player once obtained the item themselves, which is what
+     * {@code unlock-by-sell} reads, and the ledger a {@code lifetime-sell} cap
+     * counts against.
+     */
+    private final Map<String, Integer> soldEver = new HashMap<>(4);
     private long totalSpent;
     private long totalEarned;
     private boolean dirty;
@@ -68,26 +78,44 @@ public final class PlayerData {
         return totalEarned;
     }
 
-    /** Amount of {@code mat} bought after rolling the day over if needed. */
-    public synchronized int boughtToday(Material mat, long today) {
+    /** Amount of {@code id} bought after rolling the day over if needed. */
+    public synchronized int boughtToday(String id, long today) {
         roll(today);
-        return bought.getOrDefault(mat, 0);
+        return bought.getOrDefault(id, 0);
     }
 
-    public synchronized int soldToday(Material mat, long today) {
+    public synchronized int soldToday(String id, long today) {
         roll(today);
-        return sold.getOrDefault(mat, 0);
+        return sold.getOrDefault(id, 0);
     }
 
-    public synchronized void addBought(Material mat, int n, long today) {
+    public synchronized void addBought(String id, int n, long today) {
         roll(today);
-        bought.merge(mat, n, Integer::sum);
+        bought.merge(id, n, Integer::sum);
         dirty = true;
     }
 
-    public synchronized void addSold(Material mat, int n, long today) {
+    public synchronized void addSold(String id, int n, long today) {
         roll(today);
-        sold.merge(mat, n, Integer::sum);
+        sold.merge(id, n, Integer::sum);
+        dirty = true;
+    }
+
+    /** Lifetime count of {@code id} sold; day-independent. */
+    public synchronized int soldEver(String id) {
+        return soldEver.getOrDefault(id, 0);
+    }
+
+    /** Whether the player has ever sold {@code id}, i.e. proved ownership. */
+    public synchronized boolean unlocked(String id) {
+        return soldEver.getOrDefault(id, 0) > 0;
+    }
+
+    public synchronized void addSoldEver(String id, int n) {
+        if (n <= 0) {
+            return;
+        }
+        soldEver.merge(id, n, Integer::sum);
         dirty = true;
     }
 
@@ -95,6 +123,19 @@ public final class PlayerData {
     public synchronized void resetQuotas() {
         bought.clear();
         sold.clear();
+        dirty = true;
+    }
+
+    /**
+     * Admin clear of one player's lifetime counters, which re-locks every
+     * unlock-gated row and refunds their lifetime sell allowance.
+     *
+     * <p>Separate from {@link #resetQuotas} on purpose: a daily-limit reset is
+     * routine, whereas this rewrites history and is the only way back from a
+     * mis-configured cap.
+     */
+    public synchronized void resetLifetime() {
+        soldEver.clear();
         dirty = true;
     }
 
@@ -110,13 +151,18 @@ public final class PlayerData {
         dirty = false;
     }
 
-    /** Snapshot for persistence: {@code MATERIAL -> amount}. */
+    /** Snapshot for persistence: {@code id -> amount}. */
     public synchronized Map<String, Integer> boughtSnapshot() {
         return snapshot(bought);
     }
 
     public synchronized Map<String, Integer> soldSnapshot() {
         return snapshot(sold);
+    }
+
+    /** Snapshot for persistence: {@code id -> lifetime amount}. */
+    public synchronized Map<String, Integer> soldEverSnapshot() {
+        return snapshot(soldEver);
     }
 
     /** Load path; bypasses the dirty flag. */
@@ -127,10 +173,21 @@ public final class PlayerData {
         this.totalEarned = totalEarned;
     }
 
-    public synchronized void restoreCounter(boolean buy, Material mat, int n) {
-        (buy ? bought : sold).put(mat, n);
+    public synchronized void restoreCounter(boolean buy, String id, int n) {
+        (buy ? bought : sold).put(id, n);
     }
 
+    public synchronized void restoreSoldEver(String id, int n) {
+        soldEver.put(id, n);
+    }
+
+    /**
+     * Rolls the daily counters when the calendar day changed.
+     *
+     * <p>{@link #soldEver} is deliberately untouched: it is a lifetime ledger,
+     * and clearing it here would silently re-lock every unlock-gated row every
+     * midnight and hand back every lifetime allowance.
+     */
     private void roll(long today) {
         if (day != today) {
             day = today;
@@ -140,11 +197,11 @@ public final class PlayerData {
         }
     }
 
-    private static Map<String, Integer> snapshot(Map<Material, Integer> src) {
+    private static Map<String, Integer> snapshot(Map<String, Integer> src) {
         Map<String, Integer> out = new LinkedHashMap<>(src.size() * 2);
-        for (Map.Entry<Material, Integer> e : src.entrySet()) {
+        for (Map.Entry<String, Integer> e : src.entrySet()) {
             if (e.getValue() != null && e.getValue() > 0) {
-                out.put(e.getKey().name(), e.getValue());
+                out.put(e.getKey(), e.getValue());
             }
         }
         return out;
