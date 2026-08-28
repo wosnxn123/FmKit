@@ -50,10 +50,6 @@ FmKit 是一个 Minecraft 服务端插件（Folia / Paper）。传统扫地插�
 
 `/fmkit` 可简写 `/fkt`，`/fmkitadmin` 可简写 `/fkta`。完整指令与权限见 [指令手册](docs/指令手册.md)，全部配置项见 [配置指南](docs/配置指南.md)。
 
-## 姊妹插件
-
-FmShop 已迁出本仓库，独立维护于 <https://github.com/wosnxn123/FmShop>。
-
 ## 文档
 
 | 文档 | 内容 |
@@ -61,19 +57,17 @@ FmShop 已迁出本仓库，独立维护于 <https://github.com/wosnxn123/FmShop
 | [docs/配置指南.md](docs/配置指南.md) | `config.yml` 全量键位说明、默认值、旧配置迁移 |
 | [docs/指令手册.md](docs/指令手册.md) | 玩家/管理指令、权限、GUI 操作 |
 | [docs/构建与测试.md](docs/构建与测试.md) | 从源码构建、自动化测试套件（mineflayer 机器人） |
-| [FmKit/DESIGN.md](FmKit/DESIGN.md) | 设计方案 v1.1（架构、数据模型、线程模型、边界规则） |
-| [CHANGELOG.md](CHANGELOG.md) | 版本变更记录 |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 构建环境、测试要求、提交与发布约定 |
+| [DESIGN.md](DESIGN.md) | 设计方案 v1.1（架构、数据模型、线程模型、边界规则） |
 
 ## 目录结构
 
 ```
-├── FmKit/          # 回收站插件源码（Java 21，dev.fm.kit）
-│   ├── build.ps1   # 实际构建脚本（javac + jar，免 Maven）
-│   ├── pom.xml     # 依赖声明（paper-api，provided）
-│   └── DESIGN.md   # 设计方案
-├── bot/            # 自动化测试：mineflayer 机器人 + RCON 驱动
-└── docs/           # 参考文档（指令手册、配置指南、构建与测试）
+├── src/main/java/dev/fm/kit/   # 插件源码（Java 21）
+├── src/main/resources/         # plugin.yml、config.yml
+├── pom.xml                     # 依赖声明（paper-api，provided）
+├── build.ps1                   # 免 Maven 直编脚本（javac + jar）
+├── DESIGN.md                   # 设计方案
+└── docs/                       # 参考文档（指令手册、配置指南、构建与测试）
 ```
 
 ## 构建
@@ -82,13 +76,13 @@ FmShop 已迁出本仓库，独立维护于 <https://github.com/wosnxn123/FmShop
 
 | 构建脚本 | 产物 |
 |---|---|
-| `FmKit/build.ps1` | `FmKit/target/FmKit-1.1.2.jar` |
+| `build.ps1` | `target/FmKit-1.1.2.jar` |
 
 详细步骤见 [构建与测试](docs/构建与测试.md)。
 
 ## 自动化测试
 
-`bot/fmkit_test.js` 是一次性自检套件：mineflayer 机器人进服 + RCON 驱动控制台，覆盖扫地分流、死亡掉落、双清单、GUI 交互、到期流转、提醒三档、管理指令、指令别名、分页、并发安全，输出 PASS/FAIL/FATAL（有失败退 1，FATAL 退 2）。跑法见 [构建与测试](docs/构建与测试.md#自动化测试)。
+`fmkit_test.js` 是一次性自检套件：mineflayer 机器人进服 + RCON 驱动控制台，覆盖扫地分流、死亡掉落、双清单、GUI 交互、到期流转、提醒三档、管理指令、指令别名、分页、并发安全，输出 PASS/FAIL/FATAL（有失败退 1，FATAL 退 2）。套件不在本仓库：它住在作者本地与各插件仓库并列的 `bot/` 测试台里（Fm 系列插件共用一套 mineflayer + RCON 脚手架）。跑法见 [构建与测试](docs/构建与测试.md#自动化测试)。
 
 ## 许可证
 

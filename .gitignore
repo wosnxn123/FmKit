@@ -2,27 +2,8 @@
 target/
 *.class
 
-# ---- Node（测试套件） ----
-bot/node_modules/
-
-# ---- 本地测试服务端（服务端二进制/世界数据/依赖缓存，不随源码发布） ----
-servers/
-libraries/
-versions/
-logs/
-
-# ---- 独立项目，不属于本仓库 ----
-FmShop/
-FmTerm/
-FmYunbei/
-FmOptimizer/
-
-# ---- 第三方代码，不属于本仓库、不随本仓库发布 ----
-reference/
-
-# ---- 草稿素材 / 临时产物 ----
-FmKit/2e4d7f0d016926d1161ee732bd1811c3.png
-_work/
+# ---- 草稿素材 ----
+2e4d7f0d016926d1161ee732bd1811c3.png
 
 # ---- IDE / 系统 ----
 .idea/
